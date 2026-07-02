@@ -29,7 +29,7 @@ router.get("/:id", verifyToken, async (req, res) => {
 });
 
 router.put("/:id", verifyToken, async (req, res) => {
-  const { name, email, password, department, roleName, roleId } = req.body;
+  const { name, email, password, department, roleName, roleId, profilePic } = req.body;
 
   try {
     const userRef = db.collection("users").doc(req.params.id);
@@ -57,6 +57,7 @@ router.put("/:id", verifyToken, async (req, res) => {
       ...(department && { department }),
       ...(roleName   && { roleName }),
       ...(roleId     && { roleId }),
+      ...(profilePic !== undefined && { profilePic }),
       permissions,
       updatedAt: new Date(),
     };

@@ -2,6 +2,19 @@ const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const { db } = require("../config/firebase");
 
+const getNextUserId = async () => {
+  const ref = db.collection("counters").doc("users");
+  return await db.runTransaction(async (t) => {
+    const doc = await t.get(ref);
+    let next = 1;
+    if (doc.exists) {
+      next = (doc.data().last || 0) + 1;
+    }
+    t.set(ref, { last: next }, { merge: true });
+    return "UID" + String(next).padStart(3, "0");
+  });
+};
+
 exports.registerUser = async (req, res) => {
   const { name, email, password, roleId, roleName, department } = req.body;
 
@@ -29,8 +42,10 @@ exports.registerUser = async (req, res) => {
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
+    const userId = await getNextUserId();
 
-    const doc = await db.collection("users").add({
+    await db.collection("users").doc(userId).set({
+      id: userId,
       name,
       email,
       password: hashedPassword,
@@ -44,7 +59,7 @@ exports.registerUser = async (req, res) => {
 
     res.status(201).json({
       message: "User created successfully",
-      id: doc.id,
+      id: userId,
       name,
       email,
       roleName,
@@ -94,10 +109,12 @@ exports.loginUser = async (req, res) => {
     const token = jwt.sign(
       {
         id: user.id,
+        name: user.name,
         email: user.email,
         roleName: user.roleName,
         department: user.department,
         permissions,
+        profilePic: user.profilePic || null,
       },
       process.env.JWT_SECRET,
       { expiresIn: "7d" },
@@ -113,6 +130,7 @@ exports.loginUser = async (req, res) => {
         department: user.department,
         permissions,
         isActive: user.isActive,
+        profilePic: user.profilePic || null,
       },
     });
   } catch (err) {

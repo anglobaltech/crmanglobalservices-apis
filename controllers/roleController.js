@@ -1,6 +1,8 @@
 const { db } = require("../config/firebase");
 
-const MODULES = ["dashboard", "users", "sales", "allocate", "settings"];
+const slugify = (text) => text.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/(^_|_$)+/g, '');
+
+const MODULES = ["dashboard", "users", "sales", "allocate", "settings", "services"];
 
 const ROLES_CONFIG = [
   { department: "management", name: "Super Admin" },
@@ -19,18 +21,18 @@ const ROLES_CONFIG = [
 ];
 
 const DEFAULT_PERMISSIONS = {
-  "Super Admin":       { dashboard: true,  users: true,  sales: true,  leads: true,  allocate: true,  settings: true  },
-  "Founder & CEO":     { dashboard: true,  users: true,  sales: true,  leads: true,  allocate: true,  settings: true  },
-  "Director":          { dashboard: true,  users: true,  sales: true,  leads: true,  allocate: true,  settings: false },
-  "Branch Manager":    { dashboard: true,  users: false, sales: true,  leads: true,  allocate: true,  settings: false },
-  "Manager":           { dashboard: true,  users: false, sales: true,  leads: true,  allocate: false, settings: false },
-  "Team Manager":      { dashboard: true,  users: false, sales: true,  leads: true,  allocate: false, settings: false },
-  "Assistant Manager": { dashboard: true,  users: false, sales: true,  leads: false, allocate: false, settings: false },
-  "Executive":         { dashboard: true,  users: false, sales: true,  leads: false, allocate: false, settings: false },
-  "Intern":            { dashboard: true,  users: false, sales: false, leads: false, allocate: false, settings: false },
-  "Service Manager":   { dashboard: true,  users: false, sales: false, leads: false, allocate: true,  settings: false },
-  "Senior Executive":  { dashboard: true,  users: false, sales: false, leads: false, allocate: false, settings: false },
-  "Support Staff":     { dashboard: true,  users: false, sales: false, leads: false, allocate: false, settings: false },
+  "Super Admin":       { dashboard: true,  users: true,  sales: true,  leads: true,  allocate: true,  settings: true,  services: true  },
+  "Founder & CEO":     { dashboard: true,  users: true,  sales: true,  leads: true,  allocate: true,  settings: true,  services: true  },
+  "Director":          { dashboard: true,  users: true,  sales: true,  leads: true,  allocate: true,  settings: false, services: true  },
+  "Branch Manager":    { dashboard: true,  users: false, sales: true,  leads: true,  allocate: true,  settings: false, services: false },
+  "Manager":           { dashboard: true,  users: false, sales: true,  leads: true,  allocate: false, settings: false, services: false },
+  "Team Manager":      { dashboard: true,  users: false, sales: true,  leads: true,  allocate: false, settings: false, services: false },
+  "Assistant Manager": { dashboard: true,  users: false, sales: true,  leads: false, allocate: false, settings: false, services: false },
+  "Executive":         { dashboard: true,  users: false, sales: true,  leads: false, allocate: false, settings: false, services: false },
+  "Intern":            { dashboard: true,  users: false, sales: false, leads: false, allocate: false, settings: false, services: false },
+  "Service Manager":   { dashboard: true,  users: false, sales: false, leads: false, allocate: true,  settings: false, services: true  },
+  "Senior Executive":  { dashboard: true,  users: false, sales: false, leads: false, allocate: false, settings: false, services: true  },
+  "Support Staff":     { dashboard: true,  users: false, sales: false, leads: false, allocate: false, settings: false, services: true  },
 };
 
 exports.getRoles = async (req, res) => {
@@ -67,13 +69,14 @@ exports.createRole = async (req, res) => {
     if (!existing.empty)
       return res.status(400).json({ message: "Role already exists" });
 
-    const doc = await db.collection("roles").add({
+    const roleId = `${slugify(department)}_${slugify(name)}`;
+    await db.collection("roles").doc(roleId).set({
       name, department,
       permissions: permissions || {},
       createdAt: new Date(),
     });
 
-    res.status(201).json({ id: doc.id, name, department, permissions: permissions || {} });
+    res.status(201).json({ id: roleId, name, department, permissions: permissions || {} });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
@@ -131,7 +134,8 @@ exports.seedRoles = async (req, res) => {
 
     const batch = db.batch();
     for (const roleConfig of ROLES_CONFIG) {
-      const ref = db.collection("roles").doc();
+      const roleId = `${slugify(roleConfig.department)}_${slugify(roleConfig.name)}`;
+      const ref = db.collection("roles").doc(roleId);
       const permissions =
         DEFAULT_PERMISSIONS[roleConfig.name] ||
         Object.fromEntries(MODULES.map((m) => [m, m === "dashboard"]));
@@ -156,7 +160,8 @@ exports.reseedRoles = async (req, res) => {
     // Re-create with correct permissions
     const createBatch = db.batch();
     for (const roleConfig of ROLES_CONFIG) {
-      const ref = db.collection("roles").doc();
+      const roleId = `${slugify(roleConfig.department)}_${slugify(roleConfig.name)}`;
+      const ref = db.collection("roles").doc(roleId);
       const permissions =
         DEFAULT_PERMISSIONS[roleConfig.name] ||
         Object.fromEntries(MODULES.map((m) => [m, m === "dashboard"]));

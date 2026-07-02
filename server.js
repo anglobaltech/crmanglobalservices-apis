@@ -13,6 +13,7 @@ const roleRoutes = require("./routes/roleRoutes");
 const leadRoutes = require("./routes/leadRoutes");
 const salesRoutes = require("./routes/salesRoutes");
 const activityRoutes = require("./routes/activityRoutes");
+const serviceRoutes = require("./routes/serviceRoutes");
 
 const app = express();
 
@@ -53,6 +54,7 @@ app.use("/api/roles", roleRoutes);
 app.use("/api/leads", leadRoutes);
 app.use("/api/sales", salesRoutes);
 app.use("/api/activity", activityRoutes);
+app.use("/api/services", serviceRoutes);
 
 const PORT = process.env.PORT || 5000;
 
