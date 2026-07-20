@@ -2,7 +2,7 @@ const { db } = require("../config/firebase");
 
 const slugify = (text) => text.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/(^_|_$)+/g, '');
 
-const MODULES = ["dashboard", "users", "sales", "allocate", "settings", "services"];
+const MODULES = ["dashboard", "users", "sales", "allocate", "settings", "services", "projects"];
 
 const ROLES_CONFIG = [
   { department: "management", name: "Super Admin" },
@@ -21,18 +21,18 @@ const ROLES_CONFIG = [
 ];
 
 const DEFAULT_PERMISSIONS = {
-  "Super Admin":       { dashboard: true,  users: true,  sales: true,  leads: true,  allocate: true,  settings: true,  services: true  },
-  "Founder & CEO":     { dashboard: true,  users: true,  sales: true,  leads: true,  allocate: true,  settings: true,  services: true  },
-  "Director":          { dashboard: true,  users: true,  sales: true,  leads: true,  allocate: true,  settings: false, services: true  },
-  "Branch Manager":    { dashboard: true,  users: false, sales: true,  leads: true,  allocate: true,  settings: false, services: false },
-  "Manager":           { dashboard: true,  users: false, sales: true,  leads: true,  allocate: false, settings: false, services: false },
-  "Team Manager":      { dashboard: true,  users: false, sales: true,  leads: true,  allocate: false, settings: false, services: false },
-  "Assistant Manager": { dashboard: true,  users: false, sales: true,  leads: false, allocate: false, settings: false, services: false },
-  "Executive":         { dashboard: true,  users: false, sales: true,  leads: false, allocate: false, settings: false, services: false },
-  "Intern":            { dashboard: true,  users: false, sales: false, leads: false, allocate: false, settings: false, services: false },
-  "Service Manager":   { dashboard: true,  users: false, sales: false, leads: false, allocate: true,  settings: false, services: true  },
-  "Senior Executive":  { dashboard: true,  users: false, sales: false, leads: false, allocate: false, settings: false, services: true  },
-  "Support Staff":     { dashboard: true,  users: false, sales: false, leads: false, allocate: false, settings: false, services: true  },
+  "Super Admin":       { dashboard: true,  users: true,  sales: true,  leads: true,  allocate: true,  settings: true,  services: true,  projects: true  },
+  "Founder & CEO":     { dashboard: true,  users: true,  sales: true,  leads: true,  allocate: true,  settings: true,  services: true,  projects: true  },
+  "Director":          { dashboard: true,  users: true,  sales: true,  leads: true,  allocate: true,  settings: false, services: true,  projects: true  },
+  "Branch Manager":    { dashboard: true,  users: false, sales: true,  leads: true,  allocate: true,  settings: false, services: false, projects: false },
+  "Manager":           { dashboard: true,  users: false, sales: true,  leads: true,  allocate: false, settings: false, services: false, projects: false },
+  "Team Manager":      { dashboard: true,  users: false, sales: true,  leads: true,  allocate: false, settings: false, services: false, projects: false },
+  "Assistant Manager": { dashboard: true,  users: false, sales: true,  leads: false, allocate: false, settings: false, services: false, projects: false },
+  "Executive":         { dashboard: true,  users: false, sales: true,  leads: false, allocate: false, settings: false, services: false, projects: false },
+  "Intern":            { dashboard: true,  users: false, sales: false, leads: false, allocate: false, settings: false, services: false, projects: false },
+  "Service Manager":   { dashboard: true,  users: false, sales: false, leads: false, allocate: true,  settings: false, services: true,  projects: true  },
+  "Senior Executive":  { dashboard: true,  users: false, sales: false, leads: false, allocate: false, settings: false, services: true,  projects: true  },
+  "Support Staff":     { dashboard: true,  users: false, sales: false, leads: false, allocate: false, settings: false, services: true,  projects: true  },
 };
 
 exports.getRoles = async (req, res) => {

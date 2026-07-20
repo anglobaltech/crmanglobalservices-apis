@@ -6,13 +6,16 @@ exports.fetchTradeIndiaLeads = async () => {
     const ISTOffset = 330 * 60 * 1000; 
     const ISTTime = new Date(now.getTime() + ISTOffset);
     const todayStr = ISTTime.toISOString().split("T")[0];
+    
+    const yesterday = new Date(ISTTime.getTime() - 24 * 60 * 60 * 1000);
+    const yesterdayStr = yesterday.toISOString().split("T")[0];
 
     const res = await axios.get("https://www.tradeindia.com/utils/my_inquiry.html", {
       params: {
         userid: process.env.TRADEINDIA_USER_ID,
         profile_id: process.env.TRADEINDIA_PROFILE_ID,
         key: process.env.TRADEINDIA_KEY,
-        from_date: todayStr,
+        from_date: yesterdayStr,
         to_date: todayStr,
         limit: 100,
         page_no: 1,
