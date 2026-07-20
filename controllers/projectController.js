@@ -547,7 +547,7 @@ exports.getProjectActivity = asyncHandler(async (req, res) => {
 exports.createProject = asyncHandler(async (req, res) => {
   if (!isManagerUser(req.user)) throw new ApiError(403, "Managers only");
 
-  const { projectName, clientName, serviceType, assignedTo, assignedToNames, dueDate, notes } = req.body;
+  const { projectName, clientName, serviceType, assignedTo, assignedToNames, dueDate, notes, address, name, phone, email } = req.body;
   if (!projectName || !clientName || !serviceType) {
     throw new ApiError(400, "projectName, clientName, serviceType required");
   }
@@ -573,6 +573,10 @@ exports.createProject = asyncHandler(async (req, res) => {
     assignedByName: userName(req.user),
     dueDate: dueDate ? new Date(dueDate) : null,
     notes: notes || "",
+    address: address || "",
+    name: name || "",
+    phone: phone || "",
+    email: email || "",
     // ISI / BIS CRS / Hallmarking specific
     isiStages: isIsi ? buildIsiStages() : isBisCrs ? buildBisCrsStages() : isHallmarking ? buildHallmarkingStages() : [],
     isiDocSlots: isIsi ? buildIsiDocSlots() : isBisCrs ? buildBisCrsDocSlots() : isHallmarking ? buildHallmarkingDocSlots() : [],
@@ -628,7 +632,7 @@ exports.updateProject = asyncHandler(async (req, res) => {
   const activityLogs = [];
 
   if (isManager) {
-    ["projectName", "clientName", "serviceType", "notes"].forEach((f) => {
+    ["projectName", "clientName", "serviceType", "notes", "address", "name", "phone", "email"].forEach((f) => {
       if (req.body[f] !== undefined) updates[f] = req.body[f];
     });
     if (req.body.dueDate !== undefined) {
@@ -826,8 +830,25 @@ exports.addRemark = asyncHandler(async (req, res) => {
 // ─── DELETE /api/projects/:id ─
 exports.deleteProject = asyncHandler(async (req, res) => {
   if (!isManagerUser(req.user)) throw new ApiError(403, "Managers only");
+
   const doc = await db.collection("projects").doc(req.params.id).get();
-  if (!doc.exists) throw new ApiError(404, "Project not found");
-  await db.collection("projects").doc(req.params.id).update({ isDeleted: true, updatedAt: new Date() });
-  res.json({ message: "Project deleted" });
+  if (!doc.exists || doc.data().isDeleted) throw new ApiError(404, "Project not found");
+
+  await db.collection("projects").doc(req.params.id).update({
+    isDeleted: true,
+    deletedAt: new Date(),
+    deletedBy: req.user.id,
+    deletedByName: userName(req.user),
+  });
+
+  const actRef = db.collection("projects").doc(req.params.id).collection("activity");
+  await actRef.doc().set({
+    type: "deleted",
+    message: `Project deleted by ${userName(req.user)}`,
+    performedBy: req.user.id, 
+    performedByName: userName(req.user),
+    createdAt: new Date(),
+  });
+
+  res.json({ success: true, message: "Project deleted successfully" });
 });
