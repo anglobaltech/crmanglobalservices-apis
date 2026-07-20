@@ -16,25 +16,16 @@ const ISI_REQUIRED_DOCUMENTS = [
   { id: "doc_isi_3", label: "Copy of Partnership Deed / MOA (for Pvt. Ltd.)", type: "file" },
   { id: "doc_isi_4", label: "SSI Certificate / CA Certificate", type: "file" },
   { id: "doc_isi_5", label: "Electricity Bill", type: "file" },
-  {
-    id: "doc_isi_6", label: "List of Machinery", type: "table",
-    columns: ["Machinery", "Make", "Capacity", "Number", "Remark"]
-  },
-  {
-    id: "doc_isi_7", label: "List of Raw Material", type: "table",
-    columns: ["Raw Material", "Name of Supplier", "With or Without BIS Certification Mark", "Test Certificate of the Supplier", "How Received Batched / Lots Nature of Package"]
-  },
-  {
-    id: "doc_isi_8", label: "List of Testing Equipment's (With Make)", type: "table",
-    columns: ["Test Equipment / Chemicals and Identification Numbers (Where Applicable)", "Laser Count & Range (Where Applicable)", "Valid Calibration (Where Required) Yes/No", "Test Used in with Clause Reference", "Remark (Indicate Number of Equipment)"]
-  },
-  { id: "doc_isi_9", label: "Unit of production per day, per annum and price", type: "text" },
+  { id: "doc_isi_6", label: "List of Machinery", type: "file" },
+  { id: "doc_isi_7", label: "List of Raw Material", type: "file" },
+  { id: "doc_isi_8", label: "List of Testing Equipment's (With Make)", type: "file" },
+  { id: "doc_isi_9", label: "Unit of production per day, per annum and price", type: "file" },
   { id: "doc_isi_10", label: "Process Flow Chart & Detailed Production Process Description", type: "file" },
-  { id: "doc_isi_11", label: "Brand Name to be covered", type: "text" },
+  { id: "doc_isi_11", label: "Brand Name to be covered", type: "file" },
   { id: "doc_isi_12", label: "Authorized Signatory for BIS with Designation", type: "file" },
   { id: "doc_isi_13", label: "Layout Plan", type: "file" },
   { id: "doc_isi_14", label: "Location Plan", type: "file" },
-  { id: "doc_isi_15", label: "Weekly Off", type: "text" },
+  { id: "doc_isi_15", label: "Weekly Off", type: "file" },
   { id: "doc_isi_16", label: "Appointment letter of QCI + Qualification Certificate + ID", type: "file" },
   { id: "doc_isi_17", label: "Letter Head", type: "file" },
   { id: "doc_isi_18", label: "E-mail address and permanent contact number", type: "text" },
