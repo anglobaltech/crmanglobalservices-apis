@@ -251,14 +251,23 @@ const BIS_CRS_REQUIRED_DOCUMENTS = [
   { id: "doc_crs_15", label: "Authorized Indian representative Govt. ID proof, Contact No., Email ID", section: "AIR & Affidavit" },
 ];
 
-const getNextProjectId = async () => {
-  const ref = db.collection("counters").doc("projects");
+const SERVICE_ID_PREFIX = {
+  isi: "ISI",
+  hallmarking: "HMC",
+  bis_crs: "CRS",
+  fmcs: "FMCS",
+};
+
+const getNextProjectId = async (serviceType) => {
+  const prefix = SERVICE_ID_PREFIX[serviceType] || "PRJ";
+  const counterKey = serviceType || "projects";
+  const ref = db.collection("counters").doc(counterKey);
   return await db.runTransaction(async (t) => {
     const doc = await t.get(ref);
     let next = 1;
     if (doc.exists) next = (doc.data().last || 0) + 1;
     t.set(ref, { last: next }, { merge: true });
-    return "PRJ" + String(next).padStart(3, "0");
+    return prefix + String(next).padStart(3, "0");
   });
 };
 
@@ -347,7 +356,7 @@ const buildHallmarkingDocSlots = () =>
   HALLMARKING_REQUIRED_DOCUMENTS.map((doc) => ({
     ...doc,
     file: null,
-    value: doc.type !== "file" ? "" : undefined,
+    value: doc.type !== "file" ? "" : null,
   }));
 
 exports.getProjects = asyncHandler(async (req, res) => {
@@ -543,7 +552,7 @@ exports.createProject = asyncHandler(async (req, res) => {
     throw new ApiError(400, "projectName, clientName, serviceType required");
   }
 
-  const projectId = await getNextProjectId();
+  const projectId = await getNextProjectId(serviceType);
   const assignedArr = Array.isArray(assignedTo) ? assignedTo : (assignedTo ? [assignedTo] : []);
   const assignedNamesArr = Array.isArray(assignedToNames) ? assignedToNames : (assignedToNames ? [assignedToNames] : []);
 
