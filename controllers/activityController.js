@@ -41,7 +41,6 @@ exports.getActivity = async (req, res) => {
     let query = db.collection(COLLECTION);
 
     if (adminRoles.includes(user.roleName)) {
-      // all logs
     } else if (managerRoles.includes(user.roleName)) {
       query = query.where("department", "==", user.department);
     } else {
@@ -85,16 +84,10 @@ exports.getActivity = async (req, res) => {
   }
 };
 
-// GET /api/activity/followups
-// Returns ALL leads where followupDate <= today (today + all overdue past dates).
-// A followup is only considered "resolved/dismissed" if the lead has a NEW
-// followupDate set in the future (meaning the agent rescheduled it forward).
-// Simply updating notes/quotation/status does NOT dismiss the notification —
-// only setting a future followupDate removes it from the bell.
 exports.getTodayFollowups = async (req, res) => {
   try {
     const userId = req.user?.id || req.user?.uid;
-    const today  = new Date().toISOString().split("T")[0]; // "YYYY-MM-DD"
+    const today  = new Date().toISOString().split("T")[0];  
 
     const snapshot = await db.collection("leads")
       .where("assignedTo", "==", userId)
@@ -121,22 +114,8 @@ exports.getTodayFollowups = async (req, res) => {
         };
       })
       .filter(lead => {
-        // Must have a followupDate
         if (!lead.followupDate) return false;
-
-        // ✅ CORE RULE: show if followupDate is today OR any past date.
-        // followupDate is stored as "YYYY-MM-DD" string — plain string compare works.
-        if (lead.followupDate > today) return false; // future → don't show
-
-        // ✅ A followup is only "resolved" if a NEW followupDate was set
-        // that is strictly in the future. If followupDate is still today
-        // or in the past, it must show regardless of any other updates.
-        // This means: we NEVER suppress based on updatedAt alone.
-        // The only way to dismiss a followup from notifications is to either:
-        //   1. Set a new followupDate in the future (rescheduled), OR
-        //   2. Set followupDate to null/empty (cleared)
-        // Both of those cases are already handled above (followupDate > today → skip,
-        // or !followupDate → skip), so we simply return true here.
+        if (lead.followupDate > today) return false; 
 
         return true;
       });
@@ -148,7 +127,6 @@ exports.getTodayFollowups = async (req, res) => {
   }
 };
 
-// GET /api/activity/stats — summary stats for dashboard cards
 exports.getActivityStats = async (req, res) => {
   try {
     const user = req.user;

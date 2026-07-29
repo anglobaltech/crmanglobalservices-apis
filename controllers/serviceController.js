@@ -2,10 +2,8 @@ const { db } = require("../config/firebase");
 const asyncHandler = require("../utils/asyncHandler");
 const ApiError = require("../utils/ApiError");
 
-// Safely resolve user display name — JWT may not carry a name field
 const userName = (u) => u?.name || u?.email || "System";
 
-// Manager check: management dept, users permission, or a manager-level role
 const isManagerUser = (user) =>
   user?.department === "management" ||
   user?.permissions?.users === true ||
@@ -25,13 +23,10 @@ const getNextServiceId = async () => {
   });
 };
 
-// GET /api/services
-// Employees see only their tasks; managers see all
 exports.getServices = asyncHandler(async (req, res) => {
   const { status, priority, assignedTo, search, page = 1, pageSize = 20 } = req.query;
   const isManager = isManagerUser(req.user);
 
-  // Fetch all non-deleted services — filter in memory to avoid Firestore composite index
   const [snap, usersSnap] = await Promise.all([
     db.collection("services").get(),
     db.collection("users").get()
@@ -58,18 +53,15 @@ exports.getServices = asyncHandler(async (req, res) => {
     })
     .filter((s) => s.isDeleted !== true);
 
-  // Permission filter — employees only see their tasks
   if (!isManager) {
     services = services.filter((s) => s.assignedTo === req.user.id);
   } else if (assignedTo) {
     services = services.filter((s) => s.assignedTo === assignedTo);
   }
 
-  // Dropdown filters
   if (status) services = services.filter((s) => s.status === status);
   if (priority) services = services.filter((s) => s.priority === priority);
 
-  // Search
   if (search) {
     const q = search.toLowerCase();
     services = services.filter((s) =>
@@ -80,7 +72,6 @@ exports.getServices = asyncHandler(async (req, res) => {
     );
   }
 
-  // Sort newest first
   services.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
 
   const total = services.length;
@@ -90,16 +81,13 @@ exports.getServices = asyncHandler(async (req, res) => {
   res.json({ services: paginated, total, page: parseInt(page), pageSize: parseInt(pageSize) });
 });
 
-// GET /api/services/stats
 exports.getDashboardStats = asyncHandler(async (req, res) => {
   const isManager = isManagerUser(req.user);
   const now = new Date();
 
-  // Fetch all services (avoid composite index by fetching and filtering in memory)
   const snap = await db.collection("services").get();
   let allDocs = snap.docs.map((d) => d.data()).filter((s) => s.isDeleted !== true);
 
-  // Employees only see stats for their own assigned tasks
   if (!isManager) {
     allDocs = allDocs.filter((s) => s.assignedTo === req.user.id);
   }

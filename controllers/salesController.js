@@ -9,12 +9,10 @@ const LEAD_STATUSES = [
   "callback","converted","meeting","call_update",
 ];
 
-// A followup is "pending" (overdue/due) if followupDate exists and is today or in the past.
-// We no longer suppress based on updatedAt — only a future followupDate clears the pending state.
 function isFollowupPending(lead, today) {
   if (!lead.followupDate) return false;
-  if (lead.followupDate > today) return false; // future date — not pending yet
-  return true; // today or overdue — always pending
+  if (lead.followupDate > today) return false; 
+  return true; 
 }
 
 exports.getMyLeads = async (req, res) => {
@@ -65,7 +63,6 @@ exports.getMyLeads = async (req, res) => {
       );
     }
 
-    // Sort: pending followups first, then by updatedAt desc
     leads.sort((a, b) => {
       const aPending = isFollowupPending(a, today) ? 1 : 0;
       const bPending = isFollowupPending(b, today) ? 1 : 0;
@@ -73,17 +70,29 @@ exports.getMyLeads = async (req, res) => {
       return new Date(b.updatedAt || b.assignedAt || 0) - new Date(a.updatedAt || a.assignedAt || 0);
     });
 
-    const allSnap = await db.collection(COLLECTION).where("assignedTo","==",userId).get();
-    const all = allSnap.docs.map((d) => d.data());
+    const [
+      totalSnap, contactedSnap, interestedSnap, convertedSnap,
+      callbackSnap, notInterestedSnap, meetingSnap, callUpdateSnap
+    ] = await Promise.all([
+      db.collection(COLLECTION).where("assignedTo","==",userId).count().get(),
+      db.collection(COLLECTION).where("assignedTo","==",userId).where("status","==","contacted").count().get(),
+      db.collection(COLLECTION).where("assignedTo","==",userId).where("status","==","interested").count().get(),
+      db.collection(COLLECTION).where("assignedTo","==",userId).where("status","==","converted").count().get(),
+      db.collection(COLLECTION).where("assignedTo","==",userId).where("status","==","callback").count().get(),
+      db.collection(COLLECTION).where("assignedTo","==",userId).where("status","==","not_interested").count().get(),
+      db.collection(COLLECTION).where("assignedTo","==",userId).where("status","==","meeting").count().get(),
+      db.collection(COLLECTION).where("assignedTo","==",userId).where("status","==","call_update").count().get(),
+    ]);
+
     const stats = {
-      total:          all.length,
-      contacted:      all.filter(l => l.status === "contacted").length,
-      interested:     all.filter(l => l.status === "interested").length,
-      converted:      all.filter(l => l.status === "converted").length,
-      callback:       all.filter(l => l.status === "callback").length,
-      not_interested: all.filter(l => l.status === "not_interested").length,
-      meeting:        all.filter(l => l.status === "meeting").length,
-      call_update:    all.filter(l => l.status === "call_update").length,
+      total:          totalSnap.data().count,
+      contacted:      contactedSnap.data().count,
+      interested:     interestedSnap.data().count,
+      converted:      convertedSnap.data().count,
+      callback:       callbackSnap.data().count,
+      not_interested: notInterestedSnap.data().count,
+      meeting:        meetingSnap.data().count,
+      call_update:    callUpdateSnap.data().count,
     };
 
     const total = leads.length;
@@ -131,13 +140,11 @@ exports.updateLeadStatus = async (req, res) => {
     if (meetingDate    !== undefined) updates.meetingDate    = meetingDate;
     if (meetingNote    !== undefined) updates.meetingNote    = meetingNote;
 
-    // quotationShared can be true / false / null (not yet set)
     if (quotationShared !== undefined) {
       updates.quotationShared = quotationShared === true || quotationShared === "true" ? true
         : quotationShared === false || quotationShared === "false" ? false
         : null;
     }
-    // Only save amount when quotation was shared
     if (updates.quotationShared === true && quotationAmount !== undefined && quotationAmount !== "") {
       updates.quotationAmount = Number(quotationAmount);
     } else {

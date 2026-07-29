@@ -810,6 +810,37 @@ exports.getLeads = async (req, res) => {
       assignedTo, search, page = 1, limit = 20,
     } = req.query;
 
+    const hasFilters = status || source || city || state || productInterest || assignedTo || search;
+
+    // Fast path: No filters, use direct database pagination
+    if (!hasFilters) {
+      const start = (parseInt(page) - 1) * parseInt(limit);
+      
+      const [totalSnap, snapshot] = await Promise.all([
+        db.collection("leads").count().get(),
+        db.collection("leads")
+          .orderBy("createdAt", "desc")
+          .offset(start)
+          .limit(parseInt(limit))
+          .get()
+      ]);
+
+      const total = totalSnap.data().count;
+      const leads = snapshot.docs.map((doc) => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          ...data,
+          createdAt:  data.createdAt?.toDate?.()?.toISOString()  || null,
+          updatedAt:  data.updatedAt?.toDate?.()?.toISOString()  || null,
+          assignedAt: data.assignedAt?.toDate?.()?.toISOString() || null,
+        };
+      });
+
+      return res.json({ leads, total, page: parseInt(page), limit: parseInt(limit) });
+    }
+
+    // Slow path: In-memory filtering and sorting (used when filters/search exist)
     let query = db.collection("leads");
     if (status)          query = query.where("status", "==", status);
     if (source)          query = query.where("source", "==", source);
@@ -855,16 +886,23 @@ exports.getLeads = async (req, res) => {
 // GET /api/leads/stats
 exports.getStats = async (req, res) => {
   try {
-    const snapshot = await db.collection("leads").get();
-    const leads = snapshot.docs.map((d) => d.data());
+    const [totalSnap, unallocSnap, allocSnap, aggrSnap] = await Promise.all([
+      db.collection("leads").count().get(),
+      db.collection("leads").where("status", "==", "unallocated").count().get(),
+      db.collection("leads").where("status", "==", "allocated").count().get(),
+      db.collection("leads").select("source", "state").get()
+    ]);
+
     const stats = {
-      total:       leads.length,
-      unallocated: leads.filter((l) => l.status === "unallocated").length,
-      allocated:   leads.filter((l) => l.status === "allocated").length,
+      total:       totalSnap.data().count,
+      unallocated: unallocSnap.data().count,
+      allocated:   allocSnap.data().count,
       bySource: {},
       byState:  {},
     };
-    leads.forEach((l) => {
+    
+    aggrSnap.docs.forEach((d) => {
+      const l = d.data();
       if (l.source) stats.bySource[l.source] = (stats.bySource[l.source] || 0) + 1;
       if (l.state)  stats.byState[l.state]   = (stats.byState[l.state]   || 0) + 1;
     });
@@ -921,12 +959,13 @@ exports.importLeads = async (req, res) => {
     if (!Array.isArray(leads) || leads.length === 0)
       return res.status(400).json({ error: "No leads provided" });
 
-    const batch = db.batch();
+    let batch = db.batch();
     const results = { imported: 0, duplicates: 0, errors: [] };
 
     const existingSnap = await db.collection("leads").select("phone").get();
     const existingPhones = new Set(existingSnap.docs.map((d) => normalizePhone(d.data().phone)));
     const seenInFile = new Set();
+    let currentBatchCount = 0;
 
     for (const l of leads) {
       const rawPhone = l.mobile || l.phone;
@@ -956,8 +995,18 @@ exports.importLeads = async (req, res) => {
       existingPhones.add(phone);
       seenInFile.add(phone);
       results.imported++;
+      currentBatchCount++;
+
+      if (currentBatchCount >= 400) {
+        await batch.commit();
+        batch = db.batch();
+        currentBatchCount = 0;
+      }
     }
-    await batch.commit();
+    
+    if (currentBatchCount > 0) {
+      await batch.commit();
+    }
     res.json(results);
   } catch (err) {
     console.error("IMPORT ERROR:", err);

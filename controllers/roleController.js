@@ -2,7 +2,7 @@ const { db } = require("../config/firebase");
 
 const slugify = (text) => text.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/(^_|_$)+/g, '');
 
-const MODULES = ["dashboard", "users", "sales", "allocate", "settings", "services", "projects"];
+const MODULES = ["dashboard", "users", "sales", "allocate", "settings", "services", "projects", "stock"];
 
 const ROLES_CONFIG = [
   { department: "management", name: "Super Admin" },
@@ -21,18 +21,18 @@ const ROLES_CONFIG = [
 ];
 
 const DEFAULT_PERMISSIONS = {
-  "Super Admin":       { dashboard: true,  users: true,  sales: true,  leads: true,  allocate: true,  settings: true,  services: true,  projects: true  },
-  "Founder & CEO":     { dashboard: true,  users: true,  sales: true,  leads: true,  allocate: true,  settings: true,  services: true,  projects: true  },
-  "Director":          { dashboard: true,  users: true,  sales: true,  leads: true,  allocate: true,  settings: false, services: true,  projects: true  },
-  "Branch Manager":    { dashboard: true,  users: false, sales: true,  leads: true,  allocate: true,  settings: false, services: false, projects: false },
-  "Manager":           { dashboard: true,  users: false, sales: true,  leads: true,  allocate: false, settings: false, services: false, projects: false },
-  "Team Manager":      { dashboard: true,  users: false, sales: true,  leads: true,  allocate: false, settings: false, services: false, projects: false },
-  "Assistant Manager": { dashboard: true,  users: false, sales: true,  leads: false, allocate: false, settings: false, services: false, projects: false },
-  "Executive":         { dashboard: true,  users: false, sales: true,  leads: false, allocate: false, settings: false, services: false, projects: false },
-  "Intern":            { dashboard: true,  users: false, sales: false, leads: false, allocate: false, settings: false, services: false, projects: false },
-  "Service Manager":   { dashboard: true,  users: false, sales: false, leads: false, allocate: true,  settings: false, services: true,  projects: true  },
-  "Senior Executive":  { dashboard: true,  users: false, sales: false, leads: false, allocate: false, settings: false, services: true,  projects: true  },
-  "Support Staff":     { dashboard: true,  users: false, sales: false, leads: false, allocate: false, settings: false, services: true,  projects: true  },
+  "Super Admin":       { dashboard: true,  users: true,  sales: true,  leads: true,  allocate: true,  settings: true,  services: true,  projects: true,  stock: true  },
+  "Founder & CEO":     { dashboard: true,  users: true,  sales: true,  leads: true,  allocate: true,  settings: true,  services: true,  projects: true,  stock: true  },
+  "Director":          { dashboard: true,  users: true,  sales: true,  leads: true,  allocate: true,  settings: false, services: true,  projects: true,  stock: true  },
+  "Branch Manager":    { dashboard: true,  users: false, sales: true,  leads: true,  allocate: true,  settings: false, services: false, projects: false, stock: false },
+  "Manager":           { dashboard: true,  users: false, sales: true,  leads: true,  allocate: false, settings: false, services: false, projects: false, stock: false },
+  "Team Manager":      { dashboard: true,  users: false, sales: true,  leads: true,  allocate: false, settings: false, services: false, projects: false, stock: false },
+  "Assistant Manager": { dashboard: true,  users: false, sales: true,  leads: false, allocate: false, settings: false, services: false, projects: false, stock: false },
+  "Executive":         { dashboard: true,  users: false, sales: true,  leads: false, allocate: false, settings: false, services: false, projects: false, stock: false },
+  "Intern":            { dashboard: true,  users: false, sales: false, leads: false, allocate: false, settings: false, services: false, projects: false, stock: false },
+  "Service Manager":   { dashboard: true,  users: false, sales: false, leads: false, allocate: true,  settings: false, services: true,  projects: true,  stock: true  },
+  "Senior Executive":  { dashboard: true,  users: false, sales: false, leads: false, allocate: false, settings: false, services: true,  projects: true,  stock: true  },
+  "Support Staff":     { dashboard: true,  users: false, sales: false, leads: false, allocate: false, settings: false, services: true,  projects: true,  stock: true  },
 };
 
 exports.getRoles = async (req, res) => {
@@ -151,13 +151,11 @@ exports.seedRoles = async (req, res) => {
 
 exports.reseedRoles = async (req, res) => {
   try {
-    // Delete all existing roles
     const snap = await db.collection("roles").get();
     const deleteBatch = db.batch();
     snap.docs.forEach((doc) => deleteBatch.delete(doc.ref));
     await deleteBatch.commit();
 
-    // Re-create with correct permissions
     const createBatch = db.batch();
     for (const roleConfig of ROLES_CONFIG) {
       const roleId = `${slugify(roleConfig.department)}_${slugify(roleConfig.name)}`;
@@ -177,7 +175,6 @@ exports.reseedRoles = async (req, res) => {
 
 exports.syncAllUsers = async (req, res) => {
   try {
-    // Get all roles as a map: "roleName|department" → permissions
     const rolesSnap = await db.collection("roles").get();
     const rolesMap = {};
     rolesSnap.docs.forEach((doc) => {
@@ -185,7 +182,6 @@ exports.syncAllUsers = async (req, res) => {
       rolesMap[`${r.name}|${r.department}`] = r.permissions || {};
     });
 
-    // Get all users
     const usersSnap = await db.collection("users").get();
     if (usersSnap.empty)
       return res.json({ message: "No users found", updated: 0 });

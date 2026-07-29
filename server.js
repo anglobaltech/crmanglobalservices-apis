@@ -25,6 +25,7 @@ const salesRoutes = require("./routes/salesRoutes");
 const activityRoutes = require("./routes/activityRoutes");
 const serviceRoutes = require("./routes/serviceRoutes");
 const projectRoutes = require("./routes/projectRoutes");
+const stockRoutes = require("./routes/stockRoutes");
 
 const app = express();
 
@@ -35,13 +36,30 @@ app.get("/", (req, res) => {
   res.send("Backend working");
 });
 
+let consecutiveFailures = 0;
+let nextAllowedRunTime = 0;
+
 const autoFetchTradeIndiaLeads = async () => {
+  const now = Date.now();
+  if (now < nextAllowedRunTime) {
+    return; // Silently skip during backoff period
+  }
+
   try {
     console.log("Auto fetching TradeIndia leads...");
     await importExternalLeads();
     console.log("TradeIndia lead sync completed");
+    
+    // Reset on success
+    consecutiveFailures = 0;
+    nextAllowedRunTime = 0;
   } catch (error) {
-    console.error("TradeIndia Auto Fetch Error:", error.message);
+    consecutiveFailures++;
+    // Exponential backoff: 5m, 10m, 20m, 40m... max 2 hours
+    const backoffMinutes = Math.min(5 * Math.pow(2, consecutiveFailures - 1), 120);
+    nextAllowedRunTime = now + backoffMinutes * 60 * 1000;
+    
+    console.error(`TradeIndia Auto Fetch Error (${consecutiveFailures} failures). Backing off for ${backoffMinutes} minutes. Error:`, error.message);
   }
 };
 
@@ -58,6 +76,7 @@ app.use("/api/sales", salesRoutes);
 app.use("/api/activity", activityRoutes);
 app.use("/api/services", serviceRoutes);
 app.use("/api/projects", projectRoutes);
+app.use("/api/stock", stockRoutes);
 
 // Global Error Handler must be the last middleware
 app.use(errorHandler);

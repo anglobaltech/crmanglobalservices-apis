@@ -10,9 +10,11 @@ if (!admin.apps.length) {
       ...serviceAccount,
       private_key: serviceAccount.private_key.replace(/\\n/g, "\n"),
     }),
+    storageBucket: `${serviceAccount.project_id}.appspot.com`,
   });
 }
 
 const db = admin.firestore();
+const bucket = admin.storage().bucket();
 
-module.exports = { db };
+module.exports = { db, bucket };

@@ -277,7 +277,6 @@ const serializeProject = (id, data) => ({
   createdAt: data.createdAt?.toDate?.()?.toISOString() || null,
   updatedAt: data.updatedAt?.toDate?.()?.toISOString() || null,
   dueDate: data.dueDate?.toDate?.()?.toISOString() || data.dueDate || null,
-  // For ISI/CRS: stages stored as isiStages
   checklist: (data.checklist || []).map((item) => ({
     ...item,
     doneAt: item.doneAt?.toDate?.()?.toISOString() || item.doneAt || null,
@@ -299,7 +298,6 @@ const canAccessProject = (user, projectData) => {
     : assigned === user.id;
 };
 
-// Build initial ISI/CRS stages from config
 const buildIsiStages = () =>
   ISI_STAGES.map((stage) => ({
     ...stage,
@@ -326,7 +324,6 @@ const buildBisCrsStages = () =>
     })),
   }));
 
-// Build initial ISI/CRS required documents
 const buildIsiDocSlots = () =>
   ISI_REQUIRED_DOCUMENTS.map((doc) => ({
     ...doc,
@@ -439,15 +436,14 @@ exports.getProjectById = asyncHandler(async (req, res) => {
         migrations.isiDocSlots = buildIsiDocSlots();
       }
     } else {
-      // Patch existing slots: add type/columns if missing (migration for new field types)
       const needsPatch = data.isiDocSlots.some(s => !s.type);
       if (needsPatch) {
         migrations.isiDocSlots = data.isiDocSlots.map(slot => {
           const def = ISI_REQUIRED_DOCUMENTS.find(d => d.id === slot.id);
-          if (!def || slot.type) return slot; // already typed
+          if (!def || slot.type) return slot; 
           const patched = { ...slot, type: def.type || "file" };
           if (def.columns) patched.columns = def.columns;
-          if (def.label) patched.label = def.label; // update label too (e.g. 6,7,8)
+          if (def.label) patched.label = def.label;
           return patched;
         });
       }
@@ -459,7 +455,6 @@ exports.getProjectById = asyncHandler(async (req, res) => {
     }
   }
 
-  // ── Auto-migrate old BIS CRS projects to new stage-based structure ────────────
   if (data.serviceType === "bis_crs") {
     const migrations = {};
     if (!data.isiStages || data.isiStages.length === 0) migrations.isiStages = buildBisCrsStages();
@@ -481,7 +476,6 @@ exports.getProjectById = asyncHandler(async (req, res) => {
     }
   }
 
-  // ── Auto-migrate old Hallmarking projects to new stage-based structure ────────
   if (data.serviceType === "hallmarking") {
     const migrations = {};
     if (!data.isiStages || data.isiStages.length === 0) migrations.isiStages = buildHallmarkingStages();
@@ -518,7 +512,6 @@ exports.getProjectById = asyncHandler(async (req, res) => {
   res.json({ ...serializeProject(doc.id, data), activity });
 });
 
-// ─── GET /api/projects/:id/activity?page=1&pageSize=10 ───
 exports.getProjectActivity = asyncHandler(async (req, res) => {
   const { page = 1, pageSize = 10 } = req.query;
   const doc = await db.collection("projects").doc(req.params.id).get();
@@ -543,7 +536,6 @@ exports.getProjectActivity = asyncHandler(async (req, res) => {
   res.json({ activity: items, total, page: parseInt(page), pageSize: parseInt(pageSize) });
 });
 
-// ─── POST /api/projects ─
 exports.createProject = asyncHandler(async (req, res) => {
   if (!isManagerUser(req.user)) throw new ApiError(403, "Managers only");
 
@@ -556,7 +548,6 @@ exports.createProject = asyncHandler(async (req, res) => {
   const assignedArr = Array.isArray(assignedTo) ? assignedTo : (assignedTo ? [assignedTo] : []);
   const assignedNamesArr = Array.isArray(assignedToNames) ? assignedToNames : (assignedToNames ? [assignedToNames] : []);
 
-  // ISI, BIS CRS, and Hallmarking use isiStages + isiDocSlots instead of a flat checklist
   const isIsi = serviceType === "isi";
   const isBisCrs = serviceType === "bis_crs";
   const isHallmarking = serviceType === "hallmarking";
@@ -577,10 +568,8 @@ exports.createProject = asyncHandler(async (req, res) => {
     name: name || "",
     phone: phone || "",
     email: email || "",
-    // ISI / BIS CRS / Hallmarking specific
     isiStages: isIsi ? buildIsiStages() : isBisCrs ? buildBisCrsStages() : isHallmarking ? buildHallmarkingStages() : [],
     isiDocSlots: isIsi ? buildIsiDocSlots() : isBisCrs ? buildBisCrsDocSlots() : isHallmarking ? buildHallmarkingDocSlots() : [],
-    // Other service types
     checklist: usesStages ? [] : (PROJECT_CHECKLISTS[serviceType] || []).map((item) => ({
       ...item,
       done: false,
@@ -619,7 +608,6 @@ exports.createProject = asyncHandler(async (req, res) => {
   res.status(201).json({ id: projectId, ...serializeProject(projectId, data) });
 });
 
-// ─── PUT /api/projects/:id ─
 exports.updateProject = asyncHandler(async (req, res) => {
   const doc = await db.collection("projects").doc(req.params.id).get();
   if (!doc.exists || doc.data().isDeleted) throw new ApiError(404, "Project not found");
@@ -689,7 +677,6 @@ exports.updateProject = asyncHandler(async (req, res) => {
   res.json({ message: "Project updated successfully" });
 });
 
-// ─── PUT /api/projects/:id/checklist/:itemId  (non-ISI flat checklist toggle) ──
 exports.toggleChecklistItem = asyncHandler(async (req, res) => {
   const { id, itemId } = req.params;
   const doc = await db.collection("projects").doc(id).get();
@@ -723,7 +710,6 @@ exports.toggleChecklistItem = asyncHandler(async (req, res) => {
   res.json({ message: "Checklist updated", done: nowDone });
 });
 
-// ─── PUT /api/projects/:id/stage/:stepId  (ISI stage step toggle + optional date + remark) ──
 exports.toggleIsiStep = asyncHandler(async (req, res) => {
   const { id, stepId } = req.params;
   const { dateValue, remark } = req.body; // optional
@@ -760,7 +746,6 @@ exports.toggleIsiStep = asyncHandler(async (req, res) => {
 
   if (!found) throw new ApiError(404, "Stage step not found");
 
-  // Auto-complete project if all ISI stages are done
   const allDone = isiStages.every((stage) => stage.steps.every((step) => step.done));
   const updatesObj = { isiStages, updatedAt: new Date() };
   if (allDone) updatesObj.status = "completed";
@@ -803,7 +788,6 @@ exports.toggleIsiStep = asyncHandler(async (req, res) => {
   res.json({ message: "Stage updated", done: nowDone, allDone });
 });
 
-// ─── POST /api/projects/:id/remark  (add standalone remark to a step or project) ──
 exports.addRemark = asyncHandler(async (req, res) => {
   const { id } = req.params;
   const { message, stepId, stepLabel } = req.body;
@@ -827,7 +811,6 @@ exports.addRemark = asyncHandler(async (req, res) => {
   res.status(201).json({ id: ref.id, message: "Remark added" });
 });
 
-// ─── DELETE /api/projects/:id ─
 exports.deleteProject = asyncHandler(async (req, res) => {
   if (!isManagerUser(req.user)) throw new ApiError(403, "Managers only");
 
