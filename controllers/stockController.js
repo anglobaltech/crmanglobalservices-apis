@@ -56,7 +56,7 @@ exports.createGateEntry = asyncHandler(async (req, res) => {
   } = req.body;
 
   const gateEntryId = await getNextId("gateEntryCounter", "GE-");
-  const folder = `stock/gate-entries/${gateEntryId}`;
+  const folder = `stock-management/gate-entry/${gateEntryId}`;
 
   // Upload files to Firebase Storage
   const [
@@ -200,7 +200,7 @@ exports.createStockEntry = asyncHandler(async (req, res) => {
   } = req.body;
 
   const stockEntryId = await getNextId("stockEntryCounter", "SE-");
-  const folder = `stock/stock-entries/${stockEntryId}`;
+  const folder = `stock-management/stock-entry/${stockEntryId}`;
 
   const [uploadedRejectedPhoto, uploadedRejectedVideo] = await Promise.all([
     uploadBase64File(rejectedItemPhoto, folder, "rejectedItemPhoto"),
@@ -299,7 +299,7 @@ exports.createStockExit = asyncHandler(async (req, res) => {
   } = req.body;
 
   const stockExitId = await getNextId("stockExitCounter", "SX-");
-  const folder = `stock/stock-exits/${stockExitId}`;
+  const folder = `stock-management/gate-exit/${stockExitId}`;
 
   const [uploadedExitPhoto, uploadedExitVideo] = await Promise.all([
     uploadBase64File(exitPhoto, folder, "exitPhoto"),
