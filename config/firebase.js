@@ -10,7 +10,7 @@ if (!admin.apps.length) {
       ...serviceAccount,
       private_key: serviceAccount.private_key.replace(/\\n/g, "\n"),
     }),
-    storageBucket: `${serviceAccount.project_id}.appspot.com`,
+    storageBucket: `${serviceAccount.project_id}.firebasestorage.app`,
   });
 }
 

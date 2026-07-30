@@ -57,7 +57,8 @@ async function uploadBase64File(base64String, folderPath, filename) {
 
     return downloadUrl;
   } catch (error) {
-    console.error("Firebase Storage Upload Error:", error);
+    console.error(`Firebase Storage Upload Error [${folderPath}/${filename}]:`, error.message);
+    console.error("Full error:", error);
     return null; // Don't throw, just return null so entry creation continues
   }
 }

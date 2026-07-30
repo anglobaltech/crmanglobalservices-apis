@@ -9,7 +9,7 @@ async function getNextId(counterDoc, prefix) {
     const snap = await t.get(ref);
     const next = snap.exists ? (snap.data().count || 0) + 1 : 1;
     t.set(ref, { count: next }, { merge: true });
-    return `${prefix}${String(next).padStart(3, "0")}`;
+    return `${prefix}${String(next).padStart(4, "0")}`;
   });
 }
 
@@ -55,7 +55,7 @@ exports.createGateEntry = asyncHandler(async (req, res) => {
     entryDate,
   } = req.body;
 
-  const gateEntryId = await getNextId("gateEntryCounter", "GE-");
+  const gateEntryId = await getNextId("gateEntryCounter", "GE");
   const folder = `stockmanagement/gateentry/${gateEntryId}`;
 
   // Upload files to Firebase Storage
@@ -199,7 +199,7 @@ exports.createStockEntry = asyncHandler(async (req, res) => {
     remarks,
   } = req.body;
 
-  const stockEntryId = await getNextId("stockEntryCounter", "SE-");
+  const stockEntryId = await getNextId("stockEntryCounter", "SE");
   const folder = `stockmanagement/stockentry/${stockEntryId}`;
 
   const [uploadedRejectedPhoto, uploadedRejectedVideo] = await Promise.all([
@@ -298,7 +298,7 @@ exports.createStockExit = asyncHandler(async (req, res) => {
     exitVideo,
   } = req.body;
 
-  const stockExitId = await getNextId("stockExitCounter", "SX-");
+  const stockExitId = await getNextId("stockExitCounter", "SX");
   const folder = `stockmanagement/stockexit/${stockExitId}`;
 
   const [uploadedExitPhoto, uploadedExitVideo] = await Promise.all([
