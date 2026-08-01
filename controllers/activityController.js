@@ -1,5 +1,6 @@
 const { db } = require("../config/firebase");
 const { Timestamp } = require("firebase-admin/firestore");
+const { getCache, setCache, clearCachePrefix } = require("../utils/cache");
 
 const COLLECTION = "activityLogs";
 
@@ -12,6 +13,9 @@ exports.logActivity = async ({ userId, userName, userRole, department, action, l
       newData: newData || null,
       createdAt: Timestamp.now(),
     });
+    clearCachePrefix("activity_");
+    clearCachePrefix("todayFollowups_");
+    clearCachePrefix("activityStats_");
   } catch (err) {
     console.error("LOG ACTIVITY ERROR:", err.message);
   }
@@ -25,12 +29,17 @@ exports.getActivity = async (req, res) => {
 
     // Isolated lead history
     if (leadId) {
-      let query = db.collection(COLLECTION).where("leadId", "==", leadId);
-      const snapshot = await query.get();
-      let logs = snapshot.docs.map(doc => {
-        const data = doc.data();
-        return { id: doc.id, ...data, createdAt: data.createdAt?.toDate?.()?.toISOString() || null };
-      });
+      const cacheKey = `activity_lead_${leadId}`;
+      let logs = getCache(cacheKey);
+      if (!logs) {
+        let query = db.collection(COLLECTION).where("leadId", "==", leadId);
+        const snapshot = await query.get();
+        logs = snapshot.docs.map(doc => {
+          const data = doc.data();
+          return { id: doc.id, ...data, createdAt: data.createdAt?.toDate?.()?.toISOString() || null };
+        });
+        setCache(cacheKey, logs);
+      }
       logs.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
       return res.json({ logs, total: logs.length, page: 1, limit: logs.length });
     }
@@ -49,11 +58,18 @@ exports.getActivity = async (req, res) => {
 
     if (userId) query = query.where("userId", "==", userId);
 
-    const snapshot = await query.get();
-    let logs = snapshot.docs.map(doc => {
-      const data = doc.data();
-      return { id: doc.id, ...data, createdAt: data.createdAt?.toDate?.()?.toISOString() || null };
-    });
+    const reqUserId = user.id || user.uid;
+    const cacheKey = `activity_${reqUserId}_${userId || 'all'}`;
+    let logs = getCache(cacheKey);
+
+    if (!logs) {
+      const snapshot = await query.get();
+      logs = snapshot.docs.map(doc => {
+        const data = doc.data();
+        return { id: doc.id, ...data, createdAt: data.createdAt?.toDate?.()?.toISOString() || null };
+      });
+      setCache(cacheKey, logs);
+    }
 
     const today = new Date().toISOString().split("T")[0];
     const from = dateFrom || today;
@@ -89,12 +105,16 @@ exports.getTodayFollowups = async (req, res) => {
     const userId = req.user?.id || req.user?.uid;
     const today  = new Date().toISOString().split("T")[0];  
 
-    const snapshot = await db.collection("leads")
-      .where("assignedTo", "==", userId)
-      .get();
+    const reqUserId = req.user?.id || req.user?.uid;
+    const cacheKey = `todayFollowups_${reqUserId}`;
+    let snapshotLeads = getCache(cacheKey);
 
-    const leads = snapshot.docs
-      .map(doc => {
+    if (!snapshotLeads) {
+      const snapshot = await db.collection("leads")
+        .where("assignedTo", "==", userId)
+        .get();
+
+      snapshotLeads = snapshot.docs.map(doc => {
         const data = doc.data();
 
         // Safely convert Firestore Timestamps → ISO strings
@@ -112,8 +132,11 @@ exports.getTodayFollowups = async (req, res) => {
           updatedAt:  toISO(data.updatedAt),
           assignedAt: toISO(data.assignedAt),
         };
-      })
-      .filter(lead => {
+      });
+      setCache(cacheKey, snapshotLeads);
+    }
+
+    const leads = snapshotLeads.filter(lead => {
         if (!lead.followupDate) return false;
         if (lead.followupDate > today) return false; 
 
@@ -151,15 +174,37 @@ exports.getActivityStats = async (req, res) => {
       }
     }
 
-    const snapshot = await query.get();
-    let logs = snapshot.docs.map(doc => {
-      const data = doc.data();
-      return { ...data, createdAt: data.createdAt?.toDate?.()?.toISOString() || null };
-    }).filter(l => {
+    const reqUserId = user.id || user.uid;
+    const cacheKey = `activityStats_${reqUserId}`;
+    let logs = getCache(cacheKey);
+
+    if (!logs) {
+      const snapshot = await query.get();
+      logs = snapshot.docs.map(doc => {
+        const data = doc.data();
+        return { ...data, createdAt: data.createdAt?.toDate?.()?.toISOString() || null };
+      });
+      setCache(cacheKey, logs);
+    }
+    
+    logs = logs.filter(l => {
       if (!l.createdAt) return false;
       const d = new Date(l.createdAt);
       return d >= fromDt && d <= toDt;
     });
+
+    const userPerformanceMap = {};
+    logs.forEach(l => {
+      const u = l.userName || "Unknown";
+      if (!userPerformanceMap[u]) userPerformanceMap[u] = { name: u, role: l.userRole, total: 0, statuses: {} };
+      userPerformanceMap[u].total++;
+      const s = l.newData?.status;
+      if (s) {
+        userPerformanceMap[u].statuses[s] = (userPerformanceMap[u].statuses[s] || 0) + 1;
+      }
+    });
+    
+    const userPerformance = Object.values(userPerformanceMap).sort((a, b) => b.total - a.total);
 
     const stats = {
       totalUpdates:   logs.length,
@@ -170,6 +215,7 @@ exports.getActivityStats = async (req, res) => {
       contacted:      logs.filter(l => l.newData?.status === "contacted").length,
       meeting:        logs.filter(l => l.newData?.status === "meeting").length,
       call_update:    logs.filter(l => l.newData?.status === "call_update").length,
+      userPerformance: userPerformance,
     };
 
     res.json(stats);

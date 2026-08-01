@@ -1,7 +1,7 @@
 const { db } = require("../config/firebase");
 const { Timestamp } = require("firebase-admin/firestore");
 const { logActivity } = require("./activityController");
-
+const { getCache, setCache, clearCachePrefix } = require("../utils/cache");
 const COLLECTION = "leads";
 
 const LEAD_STATUSES = [
@@ -21,18 +21,23 @@ exports.getMyLeads = async (req, res) => {
     const { status, search, dateFrom, dateTo, page = 1, limit = 20 } = req.query;
 
     let query = db.collection(COLLECTION).where("assignedTo", "==", userId);
-    if (status && status !== "all") query = query.where("status", "==", status);
 
-    const snapshot = await query.get();
-    let leads = snapshot.docs.map((doc) => {
-      const d = doc.data();
-      return {
-        id: doc.id, ...d,
-        createdAt:  d.createdAt?.toDate?.()?.toISOString()  || null,
-        updatedAt:  d.updatedAt?.toDate?.()?.toISOString()  || null,
-        assignedAt: d.assignedAt?.toDate?.()?.toISOString() || null,
-      };
-    });
+    const cacheKey = `myLeads_${userId}`;
+    let leads = getCache(cacheKey);
+
+    if (!leads) {
+      const snapshot = await query.get();
+      leads = snapshot.docs.map((doc) => {
+        const d = doc.data();
+        return {
+          id: doc.id, ...d,
+          createdAt:  d.createdAt?.toDate?.()?.toISOString()  || null,
+          updatedAt:  d.updatedAt?.toDate?.()?.toISOString()  || null,
+          assignedAt: d.assignedAt?.toDate?.()?.toISOString() || null,
+        };
+      });
+      setCache(cacheKey, leads);
+    }
 
     const today = new Date().toISOString().split("T")[0];
 
@@ -47,9 +52,10 @@ exports.getMyLeads = async (req, res) => {
           return (!from || d >= from) && (!to || d <= to);
         };
         const pendingFollowup = isFollowupPending(l, today);
+        const isAllocated = l.status === "allocated";
         return inRange(l.assignedAt) || inRange(l.updatedAt) ||
                inRange(l.followupDate) || inRange(l.meetingDate) ||
-               pendingFollowup;
+               pendingFollowup || isAllocated;
       });
     }
 
@@ -63,37 +69,35 @@ exports.getMyLeads = async (req, res) => {
       );
     }
 
+    const from = dateFrom ? new Date(dateFrom + "T00:00:00") : null;
+    const to   = dateTo   ? new Date(dateTo   + "T23:59:59") : null;
+
+    const stats = {
+      total: 0, allocated: 0, contacted: 0, interested: 0, converted: 0,
+      callback: 0, not_interested: 0, meeting: 0, call_update: 0
+    };
+    leads.forEach(l => {
+      stats.total++;
+      if (l.status !== "callback" && stats[l.status] !== undefined) stats[l.status]++;
+      
+      if (l.followupDate) {
+        const fd = new Date(l.followupDate);
+        if ((!from || fd >= from) && (!to || fd <= to)) {
+          stats.callback++;
+        }
+      }
+    });
+
+    if (status && status !== "all") {
+      leads = leads.filter(l => l.status === status);
+    }
+
     leads.sort((a, b) => {
       const aPending = isFollowupPending(a, today) ? 1 : 0;
       const bPending = isFollowupPending(b, today) ? 1 : 0;
       if (bPending !== aPending) return bPending - aPending;
       return new Date(b.updatedAt || b.assignedAt || 0) - new Date(a.updatedAt || a.assignedAt || 0);
     });
-
-    const [
-      totalSnap, contactedSnap, interestedSnap, convertedSnap,
-      callbackSnap, notInterestedSnap, meetingSnap, callUpdateSnap
-    ] = await Promise.all([
-      db.collection(COLLECTION).where("assignedTo","==",userId).count().get(),
-      db.collection(COLLECTION).where("assignedTo","==",userId).where("status","==","contacted").count().get(),
-      db.collection(COLLECTION).where("assignedTo","==",userId).where("status","==","interested").count().get(),
-      db.collection(COLLECTION).where("assignedTo","==",userId).where("status","==","converted").count().get(),
-      db.collection(COLLECTION).where("assignedTo","==",userId).where("status","==","callback").count().get(),
-      db.collection(COLLECTION).where("assignedTo","==",userId).where("status","==","not_interested").count().get(),
-      db.collection(COLLECTION).where("assignedTo","==",userId).where("status","==","meeting").count().get(),
-      db.collection(COLLECTION).where("assignedTo","==",userId).where("status","==","call_update").count().get(),
-    ]);
-
-    const stats = {
-      total:          totalSnap.data().count,
-      contacted:      contactedSnap.data().count,
-      interested:     interestedSnap.data().count,
-      converted:      convertedSnap.data().count,
-      callback:       callbackSnap.data().count,
-      not_interested: notInterestedSnap.data().count,
-      meeting:        meetingSnap.data().count,
-      call_update:    callUpdateSnap.data().count,
-    };
 
     const total = leads.length;
     const start = (parseInt(page)-1) * parseInt(limit);
@@ -166,6 +170,9 @@ exports.updateLeadStatus = async (req, res) => {
       },
     });
 
+    clearCachePrefix(`myLeads_${userId}`);
+    clearCachePrefix("teamLeads");
+
     res.json({ success: true, id, status });
   } catch (err) {
     console.error("UPDATE STATUS ERROR:", err);
@@ -187,17 +194,22 @@ exports.getTeamLeads = async (req, res) => {
     const usersSnap = await usersQuery.get();
     const teamIds = usersSnap.docs.map(d => d.id);
 
-    const snapshot = await db.collection(COLLECTION).where("status","!=","unallocated").get();
-    let leads = snapshot.docs.map(doc => {
-      const d = doc.data();
-      return { id: doc.id, ...d, createdAt: d.createdAt?.toDate?.()?.toISOString()||null, updatedAt: d.updatedAt?.toDate?.()?.toISOString()||null, assignedAt: d.assignedAt?.toDate?.()?.toISOString()||null };
-    });
+    const cacheKey = "teamLeads";
+    let leads = getCache(cacheKey);
+
+    if (!leads) {
+      const snapshot = await db.collection(COLLECTION).where("status","!=","unallocated").get();
+      leads = snapshot.docs.map(doc => {
+        const d = doc.data();
+        return { id: doc.id, ...d, createdAt: d.createdAt?.toDate?.()?.toISOString()||null, updatedAt: d.updatedAt?.toDate?.()?.toISOString()||null, assignedAt: d.assignedAt?.toDate?.()?.toISOString()||null };
+      });
+      setCache(cacheKey, leads);
+    }
 
     const today = new Date().toISOString().split("T")[0];
 
     if (!adminRoles.includes(user.roleName)) leads = leads.filter(l => teamIds.includes(l.assignedTo));
     if (userId) leads = leads.filter(l => l.assignedTo === userId);
-    if (status && status !== "all") leads = leads.filter(l => l.status === status);
 
     if (dateFrom || dateTo) {
       const from = dateFrom ? new Date(dateFrom + "T00:00:00") : null;
@@ -205,11 +217,36 @@ exports.getTeamLeads = async (req, res) => {
       leads = leads.filter(l => {
         const inRange = iso => { if (!iso) return false; const d = new Date(iso); return (!from || d >= from) && (!to || d <= to); };
         const pendingFollowup = isFollowupPending(l, today);
-        return inRange(l.assignedAt) || inRange(l.updatedAt) || inRange(l.followupDate) || inRange(l.meetingDate) || pendingFollowup;
+        const isAllocated = l.status === "allocated";
+        return inRange(l.assignedAt) || inRange(l.updatedAt) || inRange(l.followupDate) || inRange(l.meetingDate) || pendingFollowup || isAllocated;
       });
     }
 
     if (search) { const q = search.toLowerCase(); leads = leads.filter(l => l.name?.toLowerCase().includes(q) || l.phone?.includes(q) || l.assignedToName?.toLowerCase().includes(q)); }
+
+    const from = dateFrom ? new Date(dateFrom + "T00:00:00") : null;
+    const to   = dateTo   ? new Date(dateTo   + "T23:59:59") : null;
+
+    const teamStats = {};
+    const stats = { total:0, allocated:0, contacted:0, interested:0, converted:0, callback:0, not_interested:0, meeting:0, call_update:0 };
+    leads.forEach(l => {
+      if (!teamStats[l.assignedToName]) teamStats[l.assignedToName] = { total:0, allocated:0, contacted:0, interested:0, converted:0, callback:0, not_interested:0, meeting:0, call_update:0 };
+      teamStats[l.assignedToName].total++;
+      if (l.status !== "callback" && teamStats[l.assignedToName][l.status] !== undefined) teamStats[l.assignedToName][l.status]++;
+      
+      stats.total++;
+      if (l.status !== "callback" && stats[l.status] !== undefined) stats[l.status]++;
+      
+      if (l.followupDate) {
+        const fd = new Date(l.followupDate);
+        if ((!from || fd >= from) && (!to || fd <= to)) {
+          teamStats[l.assignedToName].callback++;
+          stats.callback++;
+        }
+      }
+    });
+
+    if (status && status !== "all") leads = leads.filter(l => l.status === status);
 
     leads.sort((a, b) => {
       const aPending = isFollowupPending(a, today) ? 1 : 0;
@@ -221,14 +258,7 @@ exports.getTeamLeads = async (req, res) => {
     const total = leads.length;
     const start = (parseInt(page)-1) * parseInt(limit);
 
-    const teamStats = {};
-    leads.forEach(l => {
-      if (!teamStats[l.assignedToName]) teamStats[l.assignedToName] = { total:0, contacted:0, interested:0, converted:0, callback:0, not_interested:0, meeting:0, call_update:0 };
-      teamStats[l.assignedToName].total++;
-      if (teamStats[l.assignedToName][l.status] !== undefined) teamStats[l.assignedToName][l.status]++;
-    });
-
-    res.json({ leads: leads.slice(start, start+parseInt(limit)), total, teamStats, page: parseInt(page), limit: parseInt(limit) });
+    res.json({ leads: leads.slice(start, start+parseInt(limit)), total, teamStats, stats, page: parseInt(page), limit: parseInt(limit) });
   } catch (err) {
     console.error("GET TEAM LEADS ERROR:", err);
     res.status(500).json({ error: err.message });
