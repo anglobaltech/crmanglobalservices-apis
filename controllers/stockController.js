@@ -199,6 +199,20 @@ exports.createStockEntry = asyncHandler(async (req, res) => {
     remarks,
   } = req.body;
 
+  // ✅ FIX Issue #7: Server-side validation for Stock Entry
+  if (!productName || !String(productName).trim()) {
+    throw new ApiError(400, "Product name is required.");
+  }
+  if (!totalBilledQty && !approvedQty) {
+    throw new ApiError(400, "At least one of Total Billed Qty or Approved Qty is required.");
+  }
+  const parsedTotal    = totalBilledQty ? Number(totalBilledQty) : null;
+  const parsedApproved = approvedQty    ? Number(approvedQty)    : null;
+  const parsedRejected = rejectedQty    ? Number(rejectedQty)    : 0;
+  if (parsedTotal    !== null && (isNaN(parsedTotal)    || parsedTotal    < 0)) throw new ApiError(400, "Total Billed Qty must be a positive number.");
+  if (parsedApproved !== null && (isNaN(parsedApproved) || parsedApproved < 0)) throw new ApiError(400, "Approved Qty must be a positive number.");
+  if (isNaN(parsedRejected) || parsedRejected < 0) throw new ApiError(400, "Rejected Qty must be a positive number.");
+
   const stockEntryId = await getNextId("stockEntryCounter", "SE");
   const folder = `stockmanagement/stockentry/${stockEntryId}`;
 
@@ -212,9 +226,9 @@ exports.createStockEntry = asyncHandler(async (req, res) => {
     invoiceNumber: invoiceNumber || null,
     billFrom: billFrom || null,
     billTo: billTo || null,
-    totalBilledQty: totalBilledQty ? Number(totalBilledQty) : null,
-    approvedQty: approvedQty ? Number(approvedQty) : null,
-    rejectedQty: rejectedQty ? Number(rejectedQty) : 0,
+    totalBilledQty: parsedTotal,
+    approvedQty: parsedApproved,
+    rejectedQty: parsedRejected,
     rejectionReason: rejectionReason || null,
     rejectedItemPhoto: uploadedRejectedPhoto || null,
     rejectedItemVideo: uploadedRejectedVideo || null,
@@ -281,27 +295,62 @@ exports.createStockExit = asyncHandler(async (req, res) => {
   const user = req.user;
   const {
     productName,
+    batchNumber,
+    packagingType,
+    totalValue,
     qtyDispatched,
     destination,
     buyerName,
+    buyerCompanyName,
+    buyerFssaiNumber,
     buyerPhone,
     buyerGst,
+    invoiceDocNumber,
+    ewayBillApplicable,
+    ewayBillNumber,
+    transportMode,
     transporterName,
     vehicleNumber,
     driverName,
     driverPhone,
+    driverId,
     stockEntryRef,
     gateEntryRef,
     exitDate,
     remarks,
+    vehiclePhoto,
+    itemPhoto,
+    itemVideo,
+    // Keep backward compat
     exitPhoto,
     exitVideo,
   } = req.body;
 
+  // ✅ FIX Issue #7: Server-side validation for Stock Exit
+  if (!productName || !String(productName).trim()) {
+    throw new ApiError(400, "Product name is required.");
+  }
+  if (!qtyDispatched) {
+    throw new ApiError(400, "Quantity Dispatched is required.");
+  }
+  const parsedQty   = Number(qtyDispatched);
+  const parsedValue = totalValue ? Number(totalValue) : null;
+  if (isNaN(parsedQty) || parsedQty <= 0)                           throw new ApiError(400, "Quantity Dispatched must be a positive number.");
+  if (parsedValue !== null && (isNaN(parsedValue) || parsedValue < 0)) throw new ApiError(400, "Total Value must be a positive number.");
+
   const stockExitId = await getNextId("stockExitCounter", "SX");
   const folder = `stockmanagement/stockexit/${stockExitId}`;
 
-  const [uploadedExitPhoto, uploadedExitVideo] = await Promise.all([
+  const [
+    uploadedVehiclePhoto, 
+    uploadedItemPhoto, 
+    uploadedItemVideo, 
+    uploadedExitPhoto, 
+    uploadedExitVideo
+  ] = await Promise.all([
+    uploadBase64File(vehiclePhoto, folder, "vehiclePhoto"),
+    uploadBase64File(itemPhoto, folder, "itemPhoto"),
+    uploadBase64File(itemVideo, folder, "itemVideo"),
     uploadBase64File(exitPhoto, folder, "exitPhoto"),
     uploadBase64File(exitVideo, folder, "exitVideo"),
   ]);
@@ -309,19 +358,32 @@ exports.createStockExit = asyncHandler(async (req, res) => {
   const data = {
     stockExitId,
     productName: productName || null,
-    qtyDispatched: qtyDispatched ? Number(qtyDispatched) : null,
+    batchNumber: batchNumber || null,
+    packagingType: packagingType || null,
+    totalValue: parsedValue,
+    qtyDispatched: parsedQty,
     destination: destination || null,
     buyerName: buyerName || null,
+    buyerCompanyName: buyerCompanyName || null,
+    buyerFssaiNumber: buyerFssaiNumber || null,
     buyerPhone: buyerPhone || null,
     buyerGst: buyerGst || null,
+    invoiceDocNumber: invoiceDocNumber || null,
+    ewayBillApplicable: ewayBillApplicable ?? null,
+    ewayBillNumber: ewayBillNumber || null,
+    transportMode: transportMode || null,
     transporterName: transporterName || null,
     vehicleNumber: vehicleNumber || null,
     driverName: driverName || null,
     driverPhone: driverPhone || null,
+    driverId: driverId || null,
     stockEntryRef: stockEntryRef || null,
     gateEntryRef: gateEntryRef || null,
     exitDate: exitDate || new Date().toISOString().split("T")[0],
     remarks: remarks || null,
+    vehiclePhoto: uploadedVehiclePhoto || null,
+    itemPhoto: uploadedItemPhoto || null,
+    itemVideo: uploadedItemVideo || null,
     exitPhoto: uploadedExitPhoto || null,
     exitVideo: uploadedExitVideo || null,
     createdBy: user.id || user.uid || "unknown",

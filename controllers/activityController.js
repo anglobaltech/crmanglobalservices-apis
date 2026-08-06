@@ -21,7 +21,6 @@ exports.logActivity = async ({ userId, userName, userRole, department, action, l
   }
 };
 
-// GET /api/activity
 exports.getActivity = async (req, res) => {
   try {
     const { page = 1, limit = 30, userId, leadId, dateFrom, dateTo } = req.query;
@@ -32,8 +31,8 @@ exports.getActivity = async (req, res) => {
       const cacheKey = `activity_lead_${leadId}`;
       let logs = getCache(cacheKey);
       if (!logs) {
-        let query = db.collection(COLLECTION).where("leadId", "==", leadId);
-        const snapshot = await query.get();
+        // Single-field where → no composite index needed
+        const snapshot = await db.collection(COLLECTION).where("leadId", "==", leadId).get();
         logs = snapshot.docs.map(doc => {
           const data = doc.data();
           return { id: doc.id, ...data, createdAt: data.createdAt?.toDate?.()?.toISOString() || null };
@@ -47,29 +46,38 @@ exports.getActivity = async (req, res) => {
     const adminRoles   = ["Super Admin", "Founder & CEO", "Director"];
     const managerRoles = ["Branch Manager", "Manager", "Team Manager", "Assistant Manager"];
 
-    let query = db.collection(COLLECTION);
-
-    if (adminRoles.includes(user.roleName)) {
-    } else if (managerRoles.includes(user.roleName)) {
-      query = query.where("department", "==", user.department);
-    } else {
-      query = query.where("userId", "==", user.id || user.uid);
-    }
-
-    if (userId) query = query.where("userId", "==", userId);
-
     const reqUserId = user.id || user.uid;
     const cacheKey = `activity_${reqUserId}_${userId || 'all'}`;
     let logs = getCache(cacheKey);
 
     if (!logs) {
-      const snapshot = await query.get();
+      // ✅ FIX Issue #2 & #5: Use a single-field query (no composite index needed).
+      // Apply role/user filtering in-memory to avoid Firestore composite index errors.
+      // Also cap the fetch to 1000 docs to prevent full-collection scans.
+      const snapshot = await db.collection(COLLECTION)
+        .orderBy("createdAt", "desc")
+        .limit(1000)
+        .get();
+
       logs = snapshot.docs.map(doc => {
         const data = doc.data();
         return { id: doc.id, ...data, createdAt: data.createdAt?.toDate?.()?.toISOString() || null };
       });
+
+      // In-memory role filtering
+      if (!adminRoles.includes(user.roleName)) {
+        if (managerRoles.includes(user.roleName)) {
+          logs = logs.filter(l => l.department === user.department);
+        } else {
+          logs = logs.filter(l => l.userId === reqUserId);
+        }
+      }
+
       setCache(cacheKey, logs);
     }
+
+    // Further filter by specific userId if provided
+    if (userId) logs = logs.filter(l => l.userId === userId);
 
     const today = new Date().toISOString().split("T")[0];
     const from = dateFrom || today;
@@ -99,6 +107,7 @@ exports.getActivity = async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 };
+
 
 exports.getTodayFollowups = async (req, res) => {
   try {
@@ -164,26 +173,32 @@ exports.getActivityStats = async (req, res) => {
     const adminRoles   = ["Super Admin", "Founder & CEO", "Director"];
     const managerRoles = ["Branch Manager", "Manager", "Team Manager", "Assistant Manager"];
 
-    let query = db.collection(COLLECTION).where("action", "==", "status_update");
-
-    if (!adminRoles.includes(user.roleName)) {
-      if (managerRoles.includes(user.roleName)) {
-        query = query.where("department", "==", user.department);
-      } else {
-        query = query.where("userId", "==", user.id || user.uid);
-      }
-    }
-
     const reqUserId = user.id || user.uid;
     const cacheKey = `activityStats_${reqUserId}`;
     let logs = getCache(cacheKey);
 
     if (!logs) {
-      const snapshot = await query.get();
+      // ✅ FIX Issue #2: Use single-field query (action only) to avoid composite index.
+      // Role filtering done in-memory to prevent FAILED_PRECONDITION errors.
+      const snapshot = await db.collection(COLLECTION)
+        .where("action", "==", "status_update")
+        .limit(2000)
+        .get();
+
       logs = snapshot.docs.map(doc => {
         const data = doc.data();
         return { ...data, createdAt: data.createdAt?.toDate?.()?.toISOString() || null };
       });
+
+      // In-memory role filtering
+      if (!adminRoles.includes(user.roleName)) {
+        if (managerRoles.includes(user.roleName)) {
+          logs = logs.filter(l => l.department === user.department);
+        } else {
+          logs = logs.filter(l => l.userId === reqUserId);
+        }
+      }
+
       setCache(cacheKey, logs);
     }
     
@@ -223,4 +238,4 @@ exports.getActivityStats = async (req, res) => {
     console.error("GET ACTIVITY STATS ERROR:", err);
     res.status(500).json({ error: err.message });
   }
-};
+};
