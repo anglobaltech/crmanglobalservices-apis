@@ -26,12 +26,10 @@ exports.getActivity = async (req, res) => {
     const { page = 1, limit = 30, userId, leadId, dateFrom, dateTo } = req.query;
     const user = req.user;
 
-    // Isolated lead history
     if (leadId) {
       const cacheKey = `activity_lead_${leadId}`;
       let logs = getCache(cacheKey);
       if (!logs) {
-        // Single-field where → no composite index needed
         const snapshot = await db.collection(COLLECTION).where("leadId", "==", leadId).get();
         logs = snapshot.docs.map(doc => {
           const data = doc.data();
@@ -51,10 +49,7 @@ exports.getActivity = async (req, res) => {
     let logs = getCache(cacheKey);
 
     if (!logs) {
-      // ✅ FIX Issue #2 & #5: Use a single-field query (no composite index needed).
-      // Apply role/user filtering in-memory to avoid Firestore composite index errors.
-      // Also cap the fetch to 1000 docs to prevent full-collection scans.
-      const snapshot = await db.collection(COLLECTION)
+        const snapshot = await db.collection(COLLECTION)
         .orderBy("createdAt", "desc")
         .limit(1000)
         .get();
@@ -64,7 +59,6 @@ exports.getActivity = async (req, res) => {
         return { id: doc.id, ...data, createdAt: data.createdAt?.toDate?.()?.toISOString() || null };
       });
 
-      // In-memory role filtering
       if (!adminRoles.includes(user.roleName)) {
         if (managerRoles.includes(user.roleName)) {
           logs = logs.filter(l => l.department === user.department);
@@ -76,7 +70,6 @@ exports.getActivity = async (req, res) => {
       setCache(cacheKey, logs);
     }
 
-    // Further filter by specific userId if provided
     if (userId) logs = logs.filter(l => l.userId === userId);
 
     const today = new Date().toISOString().split("T")[0];
@@ -126,7 +119,6 @@ exports.getTodayFollowups = async (req, res) => {
       snapshotLeads = snapshot.docs.map(doc => {
         const data = doc.data();
 
-        // Safely convert Firestore Timestamps → ISO strings
         const toISO = (val) => {
           if (!val) return null;
           if (typeof val.toDate === "function") return val.toDate().toISOString();
@@ -178,8 +170,6 @@ exports.getActivityStats = async (req, res) => {
     let logs = getCache(cacheKey);
 
     if (!logs) {
-      // ✅ FIX Issue #2: Use single-field query (action only) to avoid composite index.
-      // Role filtering done in-memory to prevent FAILED_PRECONDITION errors.
       const snapshot = await db.collection(COLLECTION)
         .where("action", "==", "status_update")
         .limit(2000)
@@ -190,7 +180,6 @@ exports.getActivityStats = async (req, res) => {
         return { ...data, createdAt: data.createdAt?.toDate?.()?.toISOString() || null };
       });
 
-      // In-memory role filtering
       if (!adminRoles.includes(user.roleName)) {
         if (managerRoles.includes(user.roleName)) {
           logs = logs.filter(l => l.department === user.department);
@@ -238,4 +227,4 @@ exports.getActivityStats = async (req, res) => {
     console.error("GET ACTIVITY STATS ERROR:", err);
     res.status(500).json({ error: err.message });
   }
-};
+};

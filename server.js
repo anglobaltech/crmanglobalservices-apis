@@ -3,8 +3,6 @@ const express = require("express");
 const cors = require("cors");
 const cron = require("node-cron");
 
-// Suppress node-cron "missed execution" warnings that appear after
-// the computer wakes from sleep/hibernate — they are harmless.
 const _warn = console.warn.bind(console);
 console.warn = (...args) => {
   if (typeof args[0] === "string" && args[0].includes("NODE-CRON") && args[0].includes("missed")) return;
@@ -26,6 +24,7 @@ const activityRoutes = require("./routes/activityRoutes");
 const serviceRoutes = require("./routes/serviceRoutes");
 const projectRoutes = require("./routes/projectRoutes");
 const stockRoutes = require("./routes/stockRoutes");
+const employeeRoutes = require("./routes/employeeRoutes");
 
 const app = express();
 
@@ -42,7 +41,7 @@ let nextAllowedRunTime = 0;
 const autoFetchTradeIndiaLeads = async () => {
   const now = Date.now();
   if (now < nextAllowedRunTime) {
-    return; // Silently skip during backoff period
+    return;
   }
 
   try {
@@ -50,12 +49,10 @@ const autoFetchTradeIndiaLeads = async () => {
     await importExternalLeads();
     console.log("TradeIndia lead sync completed");
     
-    // Reset on success
     consecutiveFailures = 0;
     nextAllowedRunTime = 0;
   } catch (error) {
     consecutiveFailures++;
-    // Exponential backoff: 5m, 10m, 20m, 40m... max 2 hours
     const backoffMinutes = Math.min(5 * Math.pow(2, consecutiveFailures - 1), 120);
     nextAllowedRunTime = now + backoffMinutes * 60 * 1000;
     
@@ -77,8 +74,8 @@ app.use("/api/activity", activityRoutes);
 app.use("/api/services", serviceRoutes);
 app.use("/api/projects", projectRoutes);
 app.use("/api/stock", stockRoutes);
+app.use("/api/employees", employeeRoutes);
 
-// Global Error Handler must be the last middleware
 app.use(errorHandler);
 
 const PORT = process.env.PORT || 5000;

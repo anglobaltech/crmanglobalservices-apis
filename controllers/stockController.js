@@ -16,7 +16,6 @@ async function getNextId(counterDoc, prefix) {
 exports.createGateEntry = asyncHandler(async (req, res) => {
   const user = req.user;
   const {
-    // Checklist
     invoiceDocNumber,
     invoiceDocPresent,
     ewayBillNumber,
@@ -41,7 +40,6 @@ exports.createGateEntry = asyncHandler(async (req, res) => {
     gstNumberSeller,
     gstNumberBuyer,
     transporterReceiptMatch,
-    // Transport details
     transporterName,
     transporterGst,
     driverName,
@@ -50,7 +48,6 @@ exports.createGateEntry = asyncHandler(async (req, res) => {
     gateOpeningVideo,
     productVideo,
     productPhoto,
-    // Meta
     remarks,
     entryDate,
   } = req.body;
@@ -58,7 +55,6 @@ exports.createGateEntry = asyncHandler(async (req, res) => {
   const gateEntryId = await getNextId("gateEntryCounter", "GE");
   const folder = `stockmanagement/gateentry/${gateEntryId}`;
 
-  // Upload files to Firebase Storage
   const [
     uploadedCoaFile,
     uploadedDriverPhoto,
@@ -75,7 +71,6 @@ exports.createGateEntry = asyncHandler(async (req, res) => {
 
   const data = {
     gateEntryId,
-    // Checklist fields
     invoiceDocNumber: invoiceDocNumber || null,
     invoiceDocPresent: invoiceDocPresent ?? null,
     ewayBillNumber: ewayBillNumber || null,
@@ -100,7 +95,6 @@ exports.createGateEntry = asyncHandler(async (req, res) => {
     gstNumberSeller: gstNumberSeller || null,
     gstNumberBuyer: gstNumberBuyer || null,
     transporterReceiptMatch: transporterReceiptMatch ?? null,
-    // Transport
     transporterName: transporterName || null,
     transporterGst: transporterGst || null,
     driverName: driverName || null,
@@ -109,7 +103,6 @@ exports.createGateEntry = asyncHandler(async (req, res) => {
     gateOpeningVideo: uploadedGateVideo || null,
     productVideo: uploadedProductVideo || null,
     productPhoto: uploadedProductPhoto || null,
-    // Meta
     remarks: remarks || null,
     entryDate: entryDate || new Date().toISOString().split("T")[0],
     status: "open",
@@ -135,7 +128,6 @@ exports.getGateEntries = asyncHandler(async (req, res) => {
   }
 
   if (!search) {
-    // Fast path: use direct database pagination
     const [totalSnap, snap] = await Promise.all([
       baseQuery.count().get(),
       baseQuery.orderBy("createdAt", "desc").offset(start).limit(lim).get()
@@ -144,7 +136,6 @@ exports.getGateEntries = asyncHandler(async (req, res) => {
     return res.json({ entries, total: totalSnap.data().count, page: pg, limit: lim });
   }
 
-  // Slow path: in-memory search
   const snap = await baseQuery.orderBy("createdAt", "desc").get();
   let entries = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
 
@@ -174,8 +165,6 @@ exports.updateGateEntry = asyncHandler(async (req, res) => {
   res.json({ message: "Gate entry updated" });
 });
 
-// ─── STOCK ENTRY ──────────────────────────────────────────────────────────────
-
 exports.createStockEntry = asyncHandler(async (req, res) => {
   const user = req.user;
   const {
@@ -199,7 +188,6 @@ exports.createStockEntry = asyncHandler(async (req, res) => {
     remarks,
   } = req.body;
 
-  // ✅ FIX Issue #7: Server-side validation for Stock Entry
   if (!productName || !String(productName).trim()) {
     throw new ApiError(400, "Product name is required.");
   }
@@ -289,8 +277,6 @@ exports.getStockEntryById = asyncHandler(async (req, res) => {
   res.json({ id: doc.id, ...doc.data() });
 });
 
-// ─── STOCK EXIT ───────────────────────────────────────────────────────────────
-
 exports.createStockExit = asyncHandler(async (req, res) => {
   const user = req.user;
   const {
@@ -321,12 +307,10 @@ exports.createStockExit = asyncHandler(async (req, res) => {
     vehiclePhoto,
     itemPhoto,
     itemVideo,
-    // Keep backward compat
     exitPhoto,
     exitVideo,
   } = req.body;
 
-  // ✅ FIX Issue #7: Server-side validation for Stock Exit
   if (!productName || !String(productName).trim()) {
     throw new ApiError(400, "Product name is required.");
   }
@@ -434,8 +418,6 @@ exports.getStockExitById = asyncHandler(async (req, res) => {
   res.json({ id: doc.id, ...doc.data() });
 });
 
-// ─── STATS ────────────────────────────────────────────────────────────────────
-
 exports.getStockStats = asyncHandler(async (req, res) => {
   const [geSnap, seSnap, sxSnap] = await Promise.all([
     db.collection("stockGateEntries").count().get(),
@@ -461,8 +443,6 @@ exports.getStockStats = asyncHandler(async (req, res) => {
     totalRejectedQty: totalRejected,
   });
   });
-
-// ─── BULK DELETE ───────────────────────────────────────────────────────────────
 
 const bulkDeleteDocs = async (collectionName, ids) => {
   if (!ids || !ids.length) return;

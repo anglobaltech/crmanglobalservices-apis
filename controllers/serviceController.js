@@ -115,7 +115,6 @@ exports.getDashboardStats = asyncHandler(async (req, res) => {
   });
 });
 
-// GET /api/services/:id
 exports.getServiceById = asyncHandler(async (req, res) => {
   const [doc, activitySnap, usersSnap] = await Promise.all([
     db.collection("services").doc(req.params.id).get(),
@@ -158,9 +157,7 @@ exports.getServiceById = asyncHandler(async (req, res) => {
   });
 });
 
-// POST /api/services
 exports.createService = asyncHandler(async (req, res) => {
-  // Only managers can create services
   if (!isManagerUser(req.user)) {
     throw new ApiError(403, "Access denied. Only managers can create services.");
   }
@@ -231,15 +228,13 @@ exports.updateService = asyncHandler(async (req, res) => {
   const activityLogs = [];
   const isManager = isManagerUser(req.user);
 
-  // Fields all users can update
   const employeeFields = ["status", "progress", "currentStage", "comment"];
 
-  // Fields only managers can update
   const managerOnlyFields = ["serviceName", "clientName", "description", "category", "priority", "dueDate"];
 
   managerOnlyFields.forEach((f) => {
     if (req.body[f] !== undefined) {
-      if (!isManager) return; // silently skip manager-only fields for employees
+      if (!isManager) return; 
       updates[f] = req.body[f] === "" ? null : (f === "dueDate" ? new Date(req.body[f]) : req.body[f]);
     }
   });
@@ -271,7 +266,6 @@ exports.updateService = asyncHandler(async (req, res) => {
     });
   }
 
-  // Only managers can reassign
   if (req.body.assignedTo !== undefined && isManager) {
     updates.assignedTo = req.body.assignedTo;
     updates.assignedToName = req.body.assignedToName || null;
@@ -310,7 +304,6 @@ exports.updateService = asyncHandler(async (req, res) => {
   res.json({ message: "Service updated successfully", id });
 });
 
-// DELETE /api/services/:id (soft delete)
 exports.deleteService = asyncHandler(async (req, res) => {
   const doc = await db.collection("services").doc(req.params.id).get();
   if (!doc.exists) {
@@ -325,7 +318,6 @@ exports.deleteService = asyncHandler(async (req, res) => {
   res.json({ message: "Service deleted successfully" });
 });
 
-// GET /api/services/:id/activity
 exports.getActivity = asyncHandler(async (req, res) => {
   const snap = await db
     .collection("services")
@@ -343,7 +335,6 @@ exports.getActivity = asyncHandler(async (req, res) => {
   res.json(activity);
 });
 
-// POST /api/services/:id/activity
 exports.addActivity = asyncHandler(async (req, res) => {
   const { message, type } = req.body;
   if (!message) {

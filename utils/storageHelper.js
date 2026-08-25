@@ -10,13 +10,11 @@ const crypto = require("crypto");
  */
 async function uploadBase64File(base64String, folderPath, filename) {
   if (!base64String || !base64String.startsWith("data:")) {
-    return base64String; // Return as-is if it's already a URL or invalid
+    return base64String; 
   }
 
   try {
-    // Extract mime type and base64 payload
-    // data:image/jpeg;base64,/9j/4AAQSkZJRgABAQ...
-    const matches = base64String.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
+       const matches = base64String.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
     if (!matches || matches.length !== 3) {
       return null;
     }
@@ -24,7 +22,6 @@ async function uploadBase64File(base64String, folderPath, filename) {
     const mimeType = matches[1];
     const base64Data = matches[2];
     
-    // Determine extension
     let ext = "";
     if (mimeType.includes("image/jpeg")) ext = ".jpg";
     else if (mimeType.includes("image/png")) ext = ".png";
@@ -37,7 +34,6 @@ async function uploadBase64File(base64String, folderPath, filename) {
     const fullPath = `${folderPath}/${filename}${ext}`;
     const file = bucket.file(fullPath);
 
-    // Generate a secure access token
     const token = crypto.randomUUID ? crypto.randomUUID() : crypto.randomBytes(16).toString("hex");
 
     await file.save(buffer, {
@@ -49,7 +45,6 @@ async function uploadBase64File(base64String, folderPath, filename) {
       },
     });
 
-    // Construct the Firebase Storage standard download URL
     const bucketName = bucket.name;
     const downloadUrl = `https://firebasestorage.googleapis.com/v0/b/${bucketName}/o/${encodeURIComponent(
       fullPath
@@ -59,7 +54,7 @@ async function uploadBase64File(base64String, folderPath, filename) {
   } catch (error) {
     console.error(`Firebase Storage Upload Error [${folderPath}/${filename}]:`, error.message);
     console.error("Full error:", error);
-    return null; // Don't throw, just return null so entry creation continues
+    return null; 
   }
 }
 

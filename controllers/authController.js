@@ -23,7 +23,6 @@ exports.registerUser = async (req, res) => {
   if (!roleName) return res.status(400).json({ message: "Role is required" });
 
   try {
-    // Duplicate check
     const existing = await db
       .collection("users")
       .where("email", "==", email)
@@ -99,7 +98,6 @@ exports.loginUser = async (req, res) => {
 
       if (!roleSnap.empty) {
         permissions = roleSnap.docs[0].data().permissions || {};
-        // Sync back to user doc so it stays fresh
         await db.collection("users").doc(user.id).update({ permissions });
       }
     } catch (e) {

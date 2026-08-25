@@ -36,7 +36,6 @@ router.put("/:id", verifyToken, async (req, res) => {
     const userDoc = await userRef.get();
     if (!userDoc.exists) return res.status(404).json({ message: "User not found" });
 
-    // Fetch fresh permissions from role if role/department changed
     let permissions = userDoc.data().permissions || {};
     if (roleName && department) {
       try {
