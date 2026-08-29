@@ -288,6 +288,16 @@ const serializeProject = (id, data) => ({
       doneAt: step.doneAt?.toDate?.()?.toISOString() || step.doneAt || null,
     })),
   })),
+  isCodes: (data.isCodes || []).map((codeObj) => ({
+    ...codeObj,
+    stages: (codeObj.stages || []).map((stage) => ({
+      ...stage,
+      steps: (stage.steps || []).map((step) => ({
+        ...step,
+        doneAt: step.doneAt?.toDate?.()?.toISOString() || step.doneAt || null,
+      })),
+    })),
+  })),
 });
 
 const canAccessProject = (user, projectData) => {
@@ -355,6 +365,23 @@ const buildHallmarkingDocSlots = () =>
     file: null,
     value: doc.type !== "file" ? "" : null,
   }));
+
+const buildFmcsStages = () => [
+  {
+    id: "stage_fmcs_process",
+    label: "FMCS Process",
+    steps: (PROJECT_CHECKLISTS.fmcs || []).map((item) => ({
+      id: item.id,
+      label: item.label,
+      type: "step",
+      done: false,
+      doneBy: null,
+      doneByName: null,
+      doneAt: null,
+      dateValue: null,
+    })),
+  },
+];
 
 exports.getProjects = asyncHandler(async (req, res) => {
   const { serviceType, status, search, page = 1, pageSize = 20 } = req.query;
@@ -424,7 +451,9 @@ exports.getProjectById = asyncHandler(async (req, res) => {
 
   if (data.serviceType === "isi") {
     const migrations = {};
-    if (!data.isiStages || data.isiStages.length === 0) migrations.isiStages = buildIsiStages();
+    if (!data.isCodes || data.isCodes.length === 0) {
+      migrations.isCodes = [{ code: data.isCode || "", stages: data.isiStages && data.isiStages.length > 0 ? data.isiStages : buildIsiStages() }];
+    }
     if (!data.isiDocSlots || data.isiDocSlots.length === 0) {
       const oldChecklist = (data.checklist || []).filter(i => i.id?.startsWith("isi_"));
       if (oldChecklist.length > 0) {
@@ -457,7 +486,9 @@ exports.getProjectById = asyncHandler(async (req, res) => {
 
   if (data.serviceType === "bis_crs") {
     const migrations = {};
-    if (!data.isiStages || data.isiStages.length === 0) migrations.isiStages = buildBisCrsStages();
+    if (!data.isCodes || data.isCodes.length === 0) {
+      migrations.isCodes = [{ code: data.isCode || "", stages: data.isiStages && data.isiStages.length > 0 ? data.isiStages : buildBisCrsStages() }];
+    }
     if (!data.isiDocSlots || data.isiDocSlots.length === 0) {
       const oldChecklist = (data.checklist || []).filter(i => i.id?.startsWith("crs_"));
       if (oldChecklist.length > 0) {
@@ -478,7 +509,9 @@ exports.getProjectById = asyncHandler(async (req, res) => {
 
   if (data.serviceType === "hallmarking") {
     const migrations = {};
-    if (!data.isiStages || data.isiStages.length === 0) migrations.isiStages = buildHallmarkingStages();
+    if (!data.isCodes || data.isCodes.length === 0) {
+      migrations.isCodes = [{ code: data.isCode || "", stages: data.isiStages && data.isiStages.length > 0 ? data.isiStages : buildHallmarkingStages() }];
+    }
     if (!data.isiDocSlots || data.isiDocSlots.length === 0) {
       const oldChecklist = (data.checklist || []).filter(i => i.id?.startsWith("hm_"));
       if (oldChecklist.length > 0) {
@@ -489,6 +522,18 @@ exports.getProjectById = asyncHandler(async (req, res) => {
       } else {
         migrations.isiDocSlots = buildHallmarkingDocSlots();
       }
+    }
+    if (Object.keys(migrations).length > 0) {
+      migrations.updatedAt = new Date();
+      await docRef.update(migrations);
+      data = { ...data, ...migrations };
+    }
+  }
+  
+  if (data.serviceType === "fmcs") {
+    const migrations = {};
+    if (!data.isCodes || data.isCodes.length === 0) {
+      migrations.isCodes = [{ code: data.isCode || "", stages: buildFmcsStages() }];
     }
     if (Object.keys(migrations).length > 0) {
       migrations.updatedAt = new Date();
@@ -551,7 +596,19 @@ exports.createProject = asyncHandler(async (req, res) => {
   const isIsi = serviceType === "isi";
   const isBisCrs = serviceType === "bis_crs";
   const isHallmarking = serviceType === "hallmarking";
-  const usesStages = isIsi || isBisCrs || isHallmarking;
+  const isFmcs = serviceType === "fmcs";
+  const usesStages = isIsi || isBisCrs || isHallmarking || isFmcs;
+  
+  const codesArray = (isCode || "").split(',').map(c => c.trim()).filter(Boolean);
+  if (codesArray.length === 0) codesArray.push(isCode || "");
+
+  const buildStages = () => isIsi ? buildIsiStages() : isBisCrs ? buildBisCrsStages() : isHallmarking ? buildHallmarkingStages() : isFmcs ? buildFmcsStages() : [];
+
+  const isCodesArray = codesArray.map(c => ({
+    code: c,
+    stages: buildStages()
+  }));
+
   const data = {
     projectId,
     projectName,
@@ -569,7 +626,8 @@ exports.createProject = asyncHandler(async (req, res) => {
     phone: phone || "",
     email: email || "",
     isCode: isCode || "",
-    isiStages: isIsi ? buildIsiStages() : isBisCrs ? buildBisCrsStages() : isHallmarking ? buildHallmarkingStages() : [],
+    isCodes: isCodesArray,
+    isiStages: isCodesArray.length > 0 ? isCodesArray[0].stages : buildStages(), // legacy fallback
     isiDocSlots: isIsi ? buildIsiDocSlots() : isBisCrs ? buildBisCrsDocSlots() : isHallmarking ? buildHallmarkingDocSlots() : [],
     checklist: usesStages ? [] : (PROJECT_CHECKLISTS[serviceType] || []).map((item) => ({
       ...item,
@@ -621,9 +679,31 @@ exports.updateProject = asyncHandler(async (req, res) => {
   const activityLogs = [];
 
   if (isManager) {
-    ["projectName", "clientName", "serviceType", "notes", "address", "name", "phone", "email", "isCode"].forEach((f) => {
+    ["projectName", "clientName", "serviceType", "notes", "address", "name", "phone", "email"].forEach((f) => {
       if (req.body[f] !== undefined) updates[f] = req.body[f];
     });
+    if (req.body.isCode !== undefined) {
+      updates.isCode = req.body.isCode;
+      const newCodes = req.body.isCode.split(',').map(c => c.trim()).filter(Boolean);
+      if (newCodes.length === 0) newCodes.push("");
+      const existingCodes = prev.isCodes || [];
+      const updatedIsCodes = [];
+      const isIsi = prev.serviceType === "isi";
+      const isBisCrs = prev.serviceType === "bis_crs";
+      const isHallmarking = prev.serviceType === "hallmarking";
+      const isFmcs = prev.serviceType === "fmcs";
+      const buildStages = () => isIsi ? buildIsiStages() : isBisCrs ? buildBisCrsStages() : isHallmarking ? buildHallmarkingStages() : isFmcs ? buildFmcsStages() : [];
+
+      newCodes.forEach(code => {
+        const existing = existingCodes.find(e => e.code === code);
+        if (existing) {
+          updatedIsCodes.push(existing);
+        } else {
+          updatedIsCodes.push({ code, stages: buildStages() });
+        }
+      });
+      updates.isCodes = updatedIsCodes;
+    }
     if (req.body.dueDate !== undefined) {
       updates.dueDate = req.body.dueDate ? new Date(req.body.dueDate) : null;
     }
@@ -713,7 +793,7 @@ exports.toggleChecklistItem = asyncHandler(async (req, res) => {
 
 exports.toggleIsiStep = asyncHandler(async (req, res) => {
   const { id, stepId } = req.params;
-  const { dateValue, remark } = req.body; // optional
+  const { dateValue, remark, code } = req.body; 
 
   const doc = await db.collection("projects").doc(id).get();
   if (!doc.exists || doc.data().isDeleted) throw new ApiError(404, "Project not found");
@@ -721,7 +801,15 @@ exports.toggleIsiStep = asyncHandler(async (req, res) => {
   const data = doc.data();
   if (!canAccessProject(req.user, data)) throw new ApiError(403, "Access denied");
 
-  const isiStages = data.isiStages || [];
+  const isCodes = data.isCodes || [];
+  let targetCodeObj = isCodes.find(c => c.code === (code || ""));
+  
+  if (!targetCodeObj && isCodes.length > 0) {
+    targetCodeObj = isCodes[0]; 
+  }
+  
+  const isiStages = targetCodeObj ? targetCodeObj.stages : (data.isiStages || []);
+  
   let found = false;
   let stepLabel = "";
   let nowDone = false;
@@ -747,17 +835,20 @@ exports.toggleIsiStep = asyncHandler(async (req, res) => {
 
   if (!found) throw new ApiError(404, "Stage step not found");
 
-  const allDone = isiStages.every((stage) => stage.steps.every((step) => step.done));
-  const updatesObj = { isiStages, updatedAt: new Date() };
+  const allDone = isCodes.every(c => c.stages.every(stage => stage.steps.every(step => step.done)));
+  const updatesObj = { isCodes, updatedAt: new Date() };
   if (allDone) updatesObj.status = "completed";
 
   await db.collection("projects").doc(id).update(updatesObj);
+
+  const codePrefix = targetCodeObj && targetCodeObj.code ? `[${targetCodeObj.code}] ` : "";
 
   const activityLogs = [];
   activityLogs.push({
     type: "stage",
     stepId,
-    message: `"${stepLabel}" marked as ${nowDone ? "done" : "undone"} by ${userName(req.user)}`,
+    code: targetCodeObj ? targetCodeObj.code : null,
+    message: `${codePrefix}"${stepLabel}" marked as ${nowDone ? "done" : "undone"} by ${userName(req.user)}`,
     performedBy: req.user.id, performedByName: userName(req.user),
     createdAt: new Date(),
   });
@@ -766,7 +857,8 @@ exports.toggleIsiStep = asyncHandler(async (req, res) => {
       type: "remark",
       stepId,
       stepLabel,
-      message: remark,
+      code: targetCodeObj ? targetCodeObj.code : null,
+      message: `${codePrefix}${remark}`,
       performedBy: req.user.id, performedByName: userName(req.user),
       createdAt: new Date(),
     });
@@ -774,7 +866,7 @@ exports.toggleIsiStep = asyncHandler(async (req, res) => {
   if (allDone) {
     activityLogs.push({
       type: "status_changed",
-      message: `All stages completed. Project marked as Completed.`,
+      message: `All stages completed across all IS codes. Project marked as Completed.`,
       performedBy: req.user.id, performedByName: userName(req.user),
       createdAt: new Date(),
     });
