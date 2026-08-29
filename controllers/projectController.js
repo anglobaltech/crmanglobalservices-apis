@@ -539,7 +539,7 @@ exports.getProjectActivity = asyncHandler(async (req, res) => {
 exports.createProject = asyncHandler(async (req, res) => {
   if (!isManagerUser(req.user)) throw new ApiError(403, "Managers only");
 
-  const { projectName, clientName, serviceType, assignedTo, assignedToNames, dueDate, notes, address, name, phone, email } = req.body;
+  const { projectName, clientName, serviceType, assignedTo, assignedToNames, dueDate, notes, address, name, phone, email, isCode } = req.body;
   if (!projectName || !clientName || !serviceType) {
     throw new ApiError(400, "projectName, clientName, serviceType required");
   }
@@ -568,6 +568,7 @@ exports.createProject = asyncHandler(async (req, res) => {
     name: name || "",
     phone: phone || "",
     email: email || "",
+    isCode: isCode || "",
     isiStages: isIsi ? buildIsiStages() : isBisCrs ? buildBisCrsStages() : isHallmarking ? buildHallmarkingStages() : [],
     isiDocSlots: isIsi ? buildIsiDocSlots() : isBisCrs ? buildBisCrsDocSlots() : isHallmarking ? buildHallmarkingDocSlots() : [],
     checklist: usesStages ? [] : (PROJECT_CHECKLISTS[serviceType] || []).map((item) => ({
@@ -620,7 +621,7 @@ exports.updateProject = asyncHandler(async (req, res) => {
   const activityLogs = [];
 
   if (isManager) {
-    ["projectName", "clientName", "serviceType", "notes", "address", "name", "phone", "email"].forEach((f) => {
+    ["projectName", "clientName", "serviceType", "notes", "address", "name", "phone", "email", "isCode"].forEach((f) => {
       if (req.body[f] !== undefined) updates[f] = req.body[f];
     });
     if (req.body.dueDate !== undefined) {
