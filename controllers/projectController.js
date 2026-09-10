@@ -36,6 +36,7 @@ const ISI_REQUIRED_DOCUMENTS = [
   { id: "doc_isi_23", label: "Factory Test Report", type: "file" },
   { id: "doc_isi_24", label: "Designation of all members of top management", type: "file" },
   { id: "doc_isi_25", label: "Correspondence Address, scale and sector", type: "text" },
+  { id: "doc_isi_26", label: "Brand Name Declaration (ANNEX G – CM/PF307)", type: "file" },
 ];
 
 const ISI_STAGES = [

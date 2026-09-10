@@ -28,10 +28,15 @@ async function uploadBase64File(base64String, folderPath, filename) {
     else if (mimeType.includes("video/mp4")) ext = ".mp4";
     else if (mimeType.includes("video/webm")) ext = ".webm";
     else if (mimeType.includes("application/pdf")) ext = ".pdf";
+    else if (mimeType.includes("officedocument.spreadsheetml")) ext = ".xlsx";
     else ext = "." + mimeType.split("/")[1];
 
     const buffer = Buffer.from(base64Data, "base64");
-    const fullPath = `${folderPath}/${filename}${ext}`;
+    
+    // Check if filename already has an extension
+    const hasExtension = filename.includes(".");
+    const fullPath = hasExtension ? `${folderPath}/${filename}` : `${folderPath}/${filename}${ext}`;
+    
     const file = bucket.file(fullPath);
 
     const token = crypto.randomUUID ? crypto.randomUUID() : crypto.randomBytes(16).toString("hex");

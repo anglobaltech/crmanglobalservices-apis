@@ -1,6 +1,7 @@
 const { db } = require("../config/firebase");
 const asyncHandler = require("../utils/asyncHandler");
 const ApiError = require("../utils/ApiError");
+const { uploadBase64File } = require("../utils/storageHelper");
 
 const userName = (u) => u?.name || u?.email || "System";
 
@@ -162,7 +163,7 @@ exports.createService = asyncHandler(async (req, res) => {
     throw new ApiError(403, "Access denied. Only managers can create services.");
   }
 
-  const { serviceName, clientName, description, category, priority, assignedTo, assignedToName, dueDate, currentStage } = req.body;
+  const { serviceName, clientName, description, category, priority, assignedTo, assignedToName, dueDate, currentStage, files } = req.body;
   if (!serviceName || !clientName) {
     throw new ApiError(400, "serviceName and clientName are required");
   }
@@ -189,7 +190,31 @@ exports.createService = asyncHandler(async (req, res) => {
     createdAt: new Date(),
     updatedAt: new Date(),
     isDeleted: false,
+    attachments: [],
   };
+
+  // Handle file uploads if any
+  if (Array.isArray(files) && files.length > 0) {
+    const folder = `services/${serviceId}`;
+    const uploadPromises = files.map(async (file) => {
+      if (!file.base64) return null;
+      // Upload using the original filename so it preserves extension
+      const url = await uploadBase64File(file.base64, folder, file.name);
+      if (url) {
+        return {
+          name: file.name,
+          url: url,
+          size: file.size,
+          type: file.type,
+          uploadedAt: new Date(),
+        };
+      }
+      return null;
+    });
+
+    const results = await Promise.all(uploadPromises);
+    data.attachments = results.filter(r => r !== null);
+  }
 
   await db.collection("services").doc(serviceId).set(data);
 

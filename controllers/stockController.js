@@ -184,6 +184,7 @@ exports.createStockEntry = asyncHandler(async (req, res) => {
     otherPartyRole,
     gateEntryRef,
     productName,
+    batchNumber,
     entryDate,
     remarks,
   } = req.body;
@@ -227,6 +228,7 @@ exports.createStockEntry = asyncHandler(async (req, res) => {
     otherPartyRole: otherPartyRole || null,
     gateEntryRef: gateEntryRef || null,
     productName: productName || null,
+    batchNumber: batchNumber || null,
     entryDate: entryDate || new Date().toISOString().split("T")[0],
     remarks: remarks || null,
     createdBy: user.id || user.uid || "unknown",
@@ -264,6 +266,7 @@ exports.getStockEntries = asyncHandler(async (req, res) => {
     (e) =>
       (e.stockEntryId || "").toLowerCase().includes(q) ||
       (e.productName || "").toLowerCase().includes(q) ||
+      (e.batchNumber || "").toLowerCase().includes(q) ||
       (e.invoiceNumber || "").toLowerCase().includes(q) ||
       (e.billFrom || "").toLowerCase().includes(q)
   );
