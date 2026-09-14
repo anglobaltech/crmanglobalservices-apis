@@ -28,9 +28,13 @@ const employeeRoutes = require("./routes/employeeRoutes");
 
 const app = express();
 
-app.use(cors());
-app.use(express.json({ limit: "500mb" }));
-app.use(express.urlencoded({ limit: "500mb", extended: true }));
+const corsOptions = {
+  origin: ["https://crm.anglobalservices.com", "http://localhost:3000"],
+  optionsSuccessStatus: 200
+};
+app.use(cors(corsOptions));
+app.use(express.json({ limit: "10mb" }));
+app.use(express.urlencoded({ limit: "10mb", extended: true }));
 app.get("/", (req, res) => {
   res.send("Backend working");
 });
