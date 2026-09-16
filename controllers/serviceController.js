@@ -55,13 +55,24 @@ exports.getServices = asyncHandler(async (req, res) => {
     .filter((s) => s.isDeleted !== true);
 
   if (!isManager) {
-    services = services.filter((s) => s.assignedTo === req.user.id);
+    services = services.filter((s) => s.assignedTo === req.user.id || s.assignedBy === req.user.id || s.createdBy === req.user.id);
   } else if (assignedTo) {
     services = services.filter((s) => s.assignedTo === assignedTo);
   }
 
   if (status) services = services.filter((s) => s.status === status);
   if (priority) services = services.filter((s) => s.priority === priority);
+  if (req.query.kpiFilter === "active") {
+    services = services.filter((s) => s.status !== "completed" && s.status !== "cancelled" && s.status !== "pending");
+  } else if (req.query.kpiFilter === "completed") {
+    services = services.filter((s) => s.status === "completed" || s.status === "cancelled");
+  } else if (req.query.kpiFilter === "overdue") {
+    const now = new Date();
+    services = services.filter((s) => {
+      const due = s.dueDate ? new Date(s.dueDate) : null;
+      return due && due < now && s.status !== "completed" && s.status !== "cancelled";
+    });
+  }
 
   if (search) {
     const q = search.toLowerCase();
@@ -90,7 +101,7 @@ exports.getDashboardStats = asyncHandler(async (req, res) => {
   let allDocs = snap.docs.map((d) => d.data()).filter((s) => s.isDeleted !== true);
 
   if (!isManager) {
-    allDocs = allDocs.filter((s) => s.assignedTo === req.user.id);
+    allDocs = allDocs.filter((s) => s.assignedTo === req.user.id || s.assignedBy === req.user.id || s.createdBy === req.user.id);
   }
 
   let total = 0, active = 0, completed = 0, pending = 0, overdue = 0, employees = new Set();
@@ -164,15 +175,15 @@ exports.createService = asyncHandler(async (req, res) => {
   }
 
   const { serviceName, clientName, description, category, priority, assignedTo, assignedToName, dueDate, currentStage, files } = req.body;
-  if (!serviceName || !clientName) {
-    throw new ApiError(400, "serviceName and clientName are required");
+  if (!serviceName) {
+    throw new ApiError(400, "serviceName is required");
   }
 
   const serviceId = await getNextServiceId();
 
   const data = {
     serviceName,
-    clientName,
+    clientName: clientName || "",
     description: description || "",
     category: category || "General",
     priority: priority || "medium",
@@ -209,7 +220,7 @@ exports.createService = asyncHandler(async (req, res) => {
           uploadedAt: new Date(),
         };
       }
-      return null;
+      throw new Error(`Failed to upload file ${file.name}. Ensure Firebase Storage is initialized.`);
     });
 
     const results = await Promise.all(uploadPromises);

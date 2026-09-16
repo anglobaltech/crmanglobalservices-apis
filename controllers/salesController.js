@@ -18,7 +18,7 @@ function isFollowupPending(lead, today) {
 exports.getMyLeads = async (req, res) => {
   try {
     const userId = req.user?.id || req.user?.uid;
-    const { status, search, dateFrom, dateTo, page = 1, limit = 20 } = req.query;
+    const { status, search, dateFrom, dateTo, leadType, page = 1, limit = 20 } = req.query;
 
     let query = db.collection(COLLECTION).where("assignedTo", "==", userId);
 
@@ -67,6 +67,10 @@ exports.getMyLeads = async (req, res) => {
         l.email?.toLowerCase().includes(q) ||
         l.productInterest?.toLowerCase().includes(q)
       );
+    }
+
+    if (leadType) {
+      leads = leads.filter((l) => l.leadType === leadType);
     }
 
     const from = dateFrom ? new Date(dateFrom + "T00:00:00") : null;
@@ -120,16 +124,8 @@ exports.updateLeadStatus = async (req, res) => {
 
     if (!LEAD_STATUSES.includes(status)) return res.status(400).json({ error: "Invalid status: " + status });
 
-    const leadDoc = await db.collection(COLLECTION).doc(id).get();
-    if (!leadDoc.exists) return res.status(404).json({ error: "Lead not found" });
-
-    const currentLead = leadDoc.data();
     const userId = user?.id || user?.uid;
     const managerRoles = ["Super Admin","Founder & CEO","Director","Branch Manager","Manager","Team Manager"];
-
-    if (currentLead.assignedTo !== userId && !managerRoles.includes(user.roleName)) {
-      return res.status(403).json({ error: "Not authorized" });
-    }
 
     const updates = {
       status,
@@ -155,7 +151,20 @@ exports.updateLeadStatus = async (req, res) => {
       updates.quotationAmount = null;
     }
 
-    await db.collection(COLLECTION).doc(id).update(updates);
+    let currentLead;
+    const leadRef = db.collection(COLLECTION).doc(id);
+
+    await db.runTransaction(async (t) => {
+      const doc = await t.get(leadRef);
+      if (!doc.exists) throw new Error("LEAD_NOT_FOUND");
+      
+      currentLead = doc.data();
+      if (currentLead.assignedTo !== userId && !managerRoles.includes(user.roleName)) {
+        throw new Error("NOT_AUTHORIZED");
+      }
+
+      t.update(leadRef, updates);
+    });
 
     await logActivity({
       userId, userName: user.name || user.email || "Unknown",
@@ -176,13 +185,15 @@ exports.updateLeadStatus = async (req, res) => {
     res.json({ success: true, id, status });
   } catch (err) {
     console.error("UPDATE STATUS ERROR:", err);
+    if (err.message === "LEAD_NOT_FOUND") return res.status(404).json({ error: "Lead not found" });
+    if (err.message === "NOT_AUTHORIZED") return res.status(403).json({ error: "Not authorized" });
     res.status(500).json({ error: err.message });
   }
 };
 
 exports.getTeamLeads = async (req, res) => {
   try {
-    const { userId, status, search, dateFrom, dateTo, page = 1, limit = 20 } = req.query;
+    const { userId, status, search, dateFrom, dateTo, leadType, page = 1, limit = 20 } = req.query;
     const user = req.user;
 
     const managerRoles = ["Super Admin","Founder & CEO","Director","Branch Manager","Manager","Team Manager","Assistant Manager"];
@@ -223,6 +234,10 @@ exports.getTeamLeads = async (req, res) => {
     }
 
     if (search) { const q = search.toLowerCase(); leads = leads.filter(l => l.name?.toLowerCase().includes(q) || l.phone?.includes(q) || l.assignedToName?.toLowerCase().includes(q)); }
+
+    if (leadType) {
+      leads = leads.filter((l) => l.leadType === leadType);
+    }
 
     const from = dateFrom ? new Date(dateFrom + "T00:00:00") : null;
     const to   = dateTo   ? new Date(dateTo   + "T23:59:59") : null;

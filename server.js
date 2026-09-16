@@ -2,6 +2,8 @@ require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
 const cron = require("node-cron");
+const helmet = require("helmet");
+const rateLimit = require("express-rate-limit");
 
 const _warn = console.warn.bind(console);
 console.warn = (...args) => {
@@ -32,9 +34,17 @@ const corsOptions = {
   origin: ["https://crm.anglobalservices.com", "http://localhost:3000"],
   optionsSuccessStatus: 200
 };
+app.use(helmet());
 app.use(cors(corsOptions));
-app.use(express.json({ limit: "10mb" }));
-app.use(express.urlencoded({ limit: "10mb", extended: true }));
+app.use(express.json({ limit: "2mb" }));
+app.use(express.urlencoded({ limit: "2mb", extended: true }));
+
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000, 
+  max: 1000, 
+  message: "Too many requests from this IP, please try again after 15 minutes"
+});
+app.use("/api", limiter);
 app.get("/", (req, res) => {
   res.send("Backend working");
 });
