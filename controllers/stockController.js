@@ -1,4 +1,4 @@
-const { db } = require("../config/firebase");
+const { db, bucket } = require("../config/firebase");
 const asyncHandler = require("../utils/asyncHandler");
 const ApiError = require("../utils/ApiError");
 const { uploadBase64File } = require("../utils/storageHelper");
@@ -280,6 +280,14 @@ exports.getStockEntryById = asyncHandler(async (req, res) => {
   res.json({ id: doc.id, ...doc.data() });
 });
 
+exports.updateStockEntry = asyncHandler(async (req, res) => {
+  const ref = db.collection("stockEntries").doc(req.params.id);
+  const doc = await ref.get();
+  if (!doc.exists) throw new ApiError(404, "Stock entry not found");
+  await ref.update({ ...req.body, updatedAt: new Date() });
+  res.json({ message: "Stock entry updated" });
+});
+
 exports.createStockExit = asyncHandler(async (req, res) => {
   const user = req.user;
   const {
@@ -421,6 +429,14 @@ exports.getStockExitById = asyncHandler(async (req, res) => {
   res.json({ id: doc.id, ...doc.data() });
 });
 
+exports.updateStockExit = asyncHandler(async (req, res) => {
+  const ref = db.collection("stockExits").doc(req.params.id);
+  const doc = await ref.get();
+  if (!doc.exists) throw new ApiError(404, "Stock exit not found");
+  await ref.update({ ...req.body, updatedAt: new Date() });
+  res.json({ message: "Stock exit updated" });
+});
+
 exports.getStockStats = asyncHandler(async (req, res) => {
   const [geSnap, seSnap, sxSnap] = await Promise.all([
     db.collection("stockGateEntries").count().get(),
@@ -453,10 +469,36 @@ const bulkDeleteDocs = async (collectionName, ids) => {
   for (let i = 0; i < ids.length; i += chunkSize) {
     const chunk = ids.slice(i, i + chunkSize);
     const batch = db.batch();
-    chunk.forEach(id => {
-      const ref = db.collection(collectionName).doc(id);
-      batch.delete(ref);
-    });
+    
+    // Fetch documents to retrieve their custom IDs for storage deletion
+    const refs = chunk.map(id => db.collection(collectionName).doc(id));
+    const snaps = await db.getAll(...refs);
+    
+    for (const snap of snaps) {
+      if (snap.exists) {
+        const data = snap.data();
+        let folderPrefix = "";
+        
+        if (collectionName === "stockGateEntries" && data.gateEntryId) {
+          folderPrefix = `stockmanagement/gateentry/${data.gateEntryId}`;
+        } else if (collectionName === "stockEntries" && data.stockEntryId) {
+          folderPrefix = `stockmanagement/stockentry/${data.stockEntryId}`;
+        } else if (collectionName === "stockExits" && data.stockExitId) {
+          folderPrefix = `stockmanagement/stockexit/${data.stockExitId}`;
+        }
+        
+        if (folderPrefix) {
+          try {
+            await bucket.deleteFiles({ prefix: folderPrefix });
+          } catch (err) {
+            console.error(`Failed to delete storage for ${folderPrefix}`, err);
+          }
+        }
+        
+        batch.delete(snap.ref);
+      }
+    }
+    
     await batch.commit();
   }
 };

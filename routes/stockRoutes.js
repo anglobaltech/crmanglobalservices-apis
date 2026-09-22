@@ -9,9 +9,11 @@ const {
   createStockEntry,
   getStockEntries,
   getStockEntryById,
+  updateStockEntry,
   createStockExit,
   getStockExits,
   getStockExitById,
+  updateStockExit,
   getStockStats,
   bulkDeleteGateEntries,
   bulkDeleteStockEntries,
@@ -30,10 +32,12 @@ router.post("/entries/bulk-delete", verifyToken, bulkDeleteStockEntries);
 router.get("/entries", verifyToken, getStockEntries);
 router.post("/entries", verifyToken, createStockEntry);
 router.get("/entries/:id", verifyToken, getStockEntryById);
+router.patch("/entries/:id", verifyToken, updateStockEntry);
 
 router.post("/exits/bulk-delete", verifyToken, bulkDeleteStockExits);
 router.get("/exits", verifyToken, getStockExits);
 router.post("/exits", verifyToken, createStockExit);
 router.get("/exits/:id", verifyToken, getStockExitById);
+router.patch("/exits/:id", verifyToken, updateStockExit);
 
 module.exports = router;
