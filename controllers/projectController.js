@@ -441,17 +441,8 @@ exports.getProjects = asyncHandler(async (req, res) => {
   const lim = parseInt(pageSize);
 
   let baseQuery = db.collection("projects").where("isDeleted", "!=", true);
-  if (serviceType) baseQuery = baseQuery.where("serviceType", "==", serviceType);
-  if (status) baseQuery = baseQuery.where("status", "==", status);
 
-  if (isManager && !search) {
-    const [totalSnap, snap] = await Promise.all([
-      baseQuery.count().get(),
-      baseQuery.orderBy("createdAt", "desc").offset(start).limit(lim).get()
-    ]);
-    const projects = snap.docs.map(d => serializeProject(d.id, d.data()));
-    return res.json({ projects, total: totalSnap.data().count, page: parseInt(page), pageSize: lim });
-  }
+
 
   // Fallback to in-memory processing for search or complex access rights
   const snap = await baseQuery.get();
@@ -468,6 +459,14 @@ exports.getProjects = asyncHandler(async (req, res) => {
       p.clientName?.toLowerCase().includes(q) ||
       p.id?.toLowerCase().includes(q)
     );
+  }
+
+  if (serviceType) {
+    projects = projects.filter((p) => p.serviceType === serviceType);
+  }
+  
+  if (status) {
+    projects = projects.filter((p) => p.status === status);
   }
 
   projects.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));

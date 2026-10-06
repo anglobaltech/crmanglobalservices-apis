@@ -31,30 +31,10 @@ exports.getServices = asyncHandler(async (req, res) => {
   const lim = parseInt(pageSize);
 
   let baseQuery = db.collection("services").where("isDeleted", "!=", true);
-  if (status) baseQuery = baseQuery.where("status", "==", status);
-  if (priority) baseQuery = baseQuery.where("priority", "==", priority);
-  if (assignedTo) baseQuery = baseQuery.where("assignedTo", "==", assignedTo);
 
   const needsMemoryFilter = search || req.query.kpiFilter || !isManager;
 
-  if (!needsMemoryFilter) {
-    const [totalSnap, snap] = await Promise.all([
-      baseQuery.count().get(),
-      baseQuery.orderBy("createdAt", "desc").offset(start).limit(lim).get()
-    ]);
-    
-    const services = snap.docs.map(d => {
-      const data = d.data();
-      return {
-        id: d.id, ...data,
-        createdAt: data.createdAt?.toDate?.()?.toISOString() || null,
-        updatedAt: data.updatedAt?.toDate?.()?.toISOString() || null,
-        assignedAt: data.assignedAt?.toDate?.()?.toISOString() || null,
-        dueDate: data.dueDate?.toDate?.()?.toISOString() || data.dueDate || null,
-      };
-    });
-    return res.json({ services, total: totalSnap.data().count, page: parseInt(page), pageSize: lim });
-  }
+
 
   // Fallback to memory for complex filters
   const snap = await baseQuery.get();
@@ -96,6 +76,10 @@ exports.getServices = asyncHandler(async (req, res) => {
       s.id?.toLowerCase().includes(q)
     );
   }
+
+  if (status) services = services.filter(s => s.status === status);
+  if (priority) services = services.filter(s => s.priority === priority);
+  if (assignedTo) services = services.filter(s => s.assignedTo === assignedTo);
 
   services.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
 
