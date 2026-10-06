@@ -32,6 +32,17 @@ router.put("/:id", verifyToken, async (req, res) => {
   const { name, email, password, department, roleName, roleId, profilePic } = req.body;
 
   try {
+    const isSelf = req.user && (req.user.id === req.params.id || req.user.uid === req.params.id);
+    const isAdmin = req.user && (req.user.roleName === "admin" || req.user.roleName === "Super Admin");
+
+    if (!isSelf && !isAdmin) {
+      return res.status(403).json({ message: "Not authorized to update this user" });
+    }
+
+    if (isSelf && !isAdmin && (roleName || roleId || department)) {
+      return res.status(403).json({ message: "Not authorized to change your own role or department" });
+    }
+
     const userRef = db.collection("users").doc(req.params.id);
     const userDoc = await userRef.get();
     if (!userDoc.exists) return res.status(404).json({ message: "User not found" });
@@ -74,6 +85,10 @@ router.put("/:id", verifyToken, async (req, res) => {
 
 router.patch("/:id/status", verifyToken, async (req, res) => {
   try {
+    if (!req.user || (req.user.roleName !== "admin" && req.user.roleName !== "Super Admin")) {
+      return res.status(403).json({ message: "Admin access required to change status" });
+    }
+
     const userRef = db.collection("users").doc(req.params.id);
     const doc = await userRef.get();
     if (!doc.exists) return res.status(404).json({ message: "User not found" });
@@ -88,6 +103,10 @@ router.patch("/:id/status", verifyToken, async (req, res) => {
 
 router.delete("/:id", verifyToken, async (req, res) => {
   try {
+    if (!req.user || (req.user.roleName !== "admin" && req.user.roleName !== "Super Admin")) {
+      return res.status(403).json({ message: "Admin access required to delete user" });
+    }
+
     const userRef = db.collection("users").doc(req.params.id);
     const doc = await userRef.get();
     if (!doc.exists) return res.status(404).json({ message: "User not found" });

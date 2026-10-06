@@ -27,41 +27,54 @@ const getNextServiceId = async () => {
 exports.getServices = asyncHandler(async (req, res) => {
   const { status, priority, assignedTo, search, page = 1, pageSize = 20 } = req.query;
   const isManager = isManagerUser(req.user);
+  const start = (parseInt(page) - 1) * parseInt(pageSize);
+  const lim = parseInt(pageSize);
 
-  const [snap, usersSnap] = await Promise.all([
-    db.collection("services").get(),
-    db.collection("users").get()
-  ]);
-  const userMap = {};
-  usersSnap.docs.forEach((d) => {
-    userMap[d.id] = d.data().name || d.data().email;
-  });
+  let baseQuery = db.collection("services").where("isDeleted", "!=", true);
+  if (status) baseQuery = baseQuery.where("status", "==", status);
+  if (priority) baseQuery = baseQuery.where("priority", "==", priority);
+  if (assignedTo) baseQuery = baseQuery.where("assignedTo", "==", assignedTo);
 
-  let services = snap.docs
-    .map((d) => {
+  const needsMemoryFilter = search || req.query.kpiFilter || !isManager;
+
+  if (!needsMemoryFilter) {
+    const [totalSnap, snap] = await Promise.all([
+      baseQuery.count().get(),
+      baseQuery.orderBy("createdAt", "desc").offset(start).limit(lim).get()
+    ]);
+    
+    const services = snap.docs.map(d => {
       const data = d.data();
       return {
-        id: d.id,
-        ...data,
-        assignedToName: userMap[data.assignedTo] || data.assignedToName,
-        createdByName: userMap[data.createdBy] || data.createdByName,
-        assignedByName: userMap[data.assignedBy] || data.assignedByName,
+        id: d.id, ...data,
         createdAt: data.createdAt?.toDate?.()?.toISOString() || null,
         updatedAt: data.updatedAt?.toDate?.()?.toISOString() || null,
         assignedAt: data.assignedAt?.toDate?.()?.toISOString() || null,
         dueDate: data.dueDate?.toDate?.()?.toISOString() || data.dueDate || null,
       };
-    })
-    .filter((s) => s.isDeleted !== true);
+    });
+    return res.json({ services, total: totalSnap.data().count, page: parseInt(page), pageSize: lim });
+  }
+
+  // Fallback to memory for complex filters
+  const snap = await baseQuery.get();
+  
+  let services = snap.docs
+    .map((d) => {
+      const data = d.data();
+      return {
+        id: d.id, ...data,
+        createdAt: data.createdAt?.toDate?.()?.toISOString() || null,
+        updatedAt: data.updatedAt?.toDate?.()?.toISOString() || null,
+        assignedAt: data.assignedAt?.toDate?.()?.toISOString() || null,
+        dueDate: data.dueDate?.toDate?.()?.toISOString() || data.dueDate || null,
+      };
+    });
 
   if (!isManager) {
     services = services.filter((s) => s.assignedTo === req.user.id || s.assignedBy === req.user.id || s.createdBy === req.user.id);
-  } else if (assignedTo) {
-    services = services.filter((s) => s.assignedTo === assignedTo);
   }
 
-  if (status) services = services.filter((s) => s.status === status);
-  if (priority) services = services.filter((s) => s.priority === priority);
   if (req.query.kpiFilter === "active") {
     services = services.filter((s) => s.status !== "completed" && s.status !== "cancelled" && s.status !== "pending");
   } else if (req.query.kpiFilter === "completed") {
@@ -87,18 +100,17 @@ exports.getServices = asyncHandler(async (req, res) => {
   services.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
 
   const total = services.length;
-  const start = (parseInt(page) - 1) * parseInt(pageSize);
-  const paginated = services.slice(start, start + parseInt(pageSize));
+  const paginated = services.slice(start, start + lim);
 
-  res.json({ services: paginated, total, page: parseInt(page), pageSize: parseInt(pageSize) });
+  res.json({ services: paginated, total, page: parseInt(page), pageSize: lim });
 });
 
 exports.getDashboardStats = asyncHandler(async (req, res) => {
   const isManager = isManagerUser(req.user);
   const now = new Date();
 
-  const snap = await db.collection("services").get();
-  let allDocs = snap.docs.map((d) => d.data()).filter((s) => s.isDeleted !== true);
+  const snap = await db.collection("services").where("isDeleted", "!=", true).get();
+  let allDocs = snap.docs.map((d) => d.data());
 
   if (!isManager) {
     allDocs = allDocs.filter((s) => s.assignedTo === req.user.id || s.assignedBy === req.user.id || s.createdBy === req.user.id);
@@ -341,6 +353,10 @@ exports.updateService = asyncHandler(async (req, res) => {
 });
 
 exports.deleteService = asyncHandler(async (req, res) => {
+  if (!isManagerUser(req.user)) {
+    throw new ApiError(403, "Access denied. Only managers can delete services.");
+  }
+
   const doc = await db.collection("services").doc(req.params.id).get();
   if (!doc.exists) {
     throw new ApiError(404, "Service not found");

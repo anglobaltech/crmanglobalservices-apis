@@ -2,33 +2,17 @@ const { db, bucket } = require("../config/firebase");
 
 const col = () => db.collection("employees");
 
-/* ─── Helper: Upload base64 file to Firebase Storage ─── */
-const uploadBase64File = async (base64Data, fileName, folder) => {
-  if (!base64Data) return "";
-  // base64Data format: "data:<mime>;base64,<data>"
-  const matches = base64Data.match(/^data:([A-Za-z0-9+/]+\/[A-Za-z0-9+/]+);base64,(.+)$/);
-  if (!matches) return "";
-  const mimeType = matches[1];
-  const buffer   = Buffer.from(matches[2], "base64");
-  const ext      = mimeType.split("/")[1].replace("jpeg", "jpg");
-  const filePath = `${folder}/${Date.now()}_${fileName}.${ext}`;
-  const file     = bucket.file(filePath);
-  await file.save(buffer, { contentType: mimeType, resumable: false });
-  await file.makePublic();
-  return `https://storage.googleapis.com/${bucket.name}/${filePath}`;
+const { uploadBase64File } = require("../utils/storageHelper");
+
+const isManagerUser = (user) => {
+  if (!user) return false;
+  const role = (user.roleName || "").toLowerCase();
+  return role === "super admin" || role === "admin" || role === "director" || role === "founder & ceo" || role.includes("manager") || user.department === "management" || user.permissions?.employees === true;
 };
 
 /* ─── Helper: Delete file from Firebase Storage by URL ─── */
 const deleteFileByUrl = async (url) => {
-  if (!url) return;
-  try {
-    const bucketName = bucket.name;
-    const prefix = `https://storage.googleapis.com/${bucketName}/`;
-    if (url.startsWith(prefix)) {
-      const filePath = url.slice(prefix.length);
-      await bucket.file(filePath).delete();
-    }
-  } catch (_) { /* ignore deletion errors */ }
+  // Deliberately empty: Firebase files should not be deleted
 };
 
 const getEmployees = async (req, res) => {
@@ -53,6 +37,9 @@ const getEmployee = async (req, res) => {
 
 const createEmployee = async (req, res) => {
   try {
+    if (!isManagerUser(req.user)) {
+      return res.status(403).json({ message: "Access denied. Managers only." });
+    }
     const {
       name, email, phone, department, designation, employeeId,
       joiningDate, salary, status = "active",
@@ -69,8 +56,8 @@ const createEmployee = async (req, res) => {
     let salarySlipUrl     = "";
     let relievingLetterUrl = "";
     if (employeeType === "experienced") {
-      salarySlipUrl      = await uploadBase64File(salarySlipBase64,     salarySlipName     || "salary_slip",     `employees/${name}/salary_slips`);
-      relievingLetterUrl = await uploadBase64File(relievingLetterBase64, relievingLetterName || "relieving_letter", `employees/${name}/relieving_letters`);
+      salarySlipUrl      = await uploadBase64File(salarySlipBase64,     `employees/${name}/salary_slips`, salarySlipName     || "salary_slip");
+      relievingLetterUrl = await uploadBase64File(relievingLetterBase64, `employees/${name}/relieving_letters`, relievingLetterName || "relieving_letter");
     }
 
     const data = {
@@ -98,6 +85,9 @@ const createEmployee = async (req, res) => {
 
 const updateEmployee = async (req, res) => {
   try {
+    if (!isManagerUser(req.user)) {
+      return res.status(403).json({ message: "Access denied. Managers only." });
+    }
     const ref = col().doc(req.params.id);
     const doc = await ref.get();
     if (!doc.exists) return res.status(404).json({ message: "Employee not found" });
@@ -120,7 +110,7 @@ const updateEmployee = async (req, res) => {
     let salarySlipUrl = existing.salarySlipUrl || "";
     if (salarySlipBase64) {
       await deleteFileByUrl(existing.salarySlipUrl);
-      salarySlipUrl = await uploadBase64File(salarySlipBase64, salarySlipName || "salary_slip", `employees/${name || existing.name}/salary_slips`);
+      salarySlipUrl = await uploadBase64File(salarySlipBase64, `employees/${name || existing.name}/salary_slips`, salarySlipName || "salary_slip");
     } else if (passedSalarySlipUrl !== undefined) {
       salarySlipUrl = passedSalarySlipUrl;
     }
@@ -129,7 +119,7 @@ const updateEmployee = async (req, res) => {
     let relievingLetterUrl = existing.relievingLetterUrl || "";
     if (relievingLetterBase64) {
       await deleteFileByUrl(existing.relievingLetterUrl);
-      relievingLetterUrl = await uploadBase64File(relievingLetterBase64, relievingLetterName || "relieving_letter", `employees/${name || existing.name}/relieving_letters`);
+      relievingLetterUrl = await uploadBase64File(relievingLetterBase64, `employees/${name || existing.name}/relieving_letters`, relievingLetterName || "relieving_letter");
     } else if (passedRelievingLetterUrl !== undefined) {
       relievingLetterUrl = passedRelievingLetterUrl;
     }
@@ -162,6 +152,9 @@ const updateEmployee = async (req, res) => {
 
 const deleteEmployee = async (req, res) => {
   try {
+    if (!isManagerUser(req.user)) {
+      return res.status(403).json({ message: "Access denied. Managers only." });
+    }
     const ref = col().doc(req.params.id);
     const doc = await ref.get();
     if (!doc.exists) return res.status(404).json({ message: "Employee not found" });
@@ -178,6 +171,9 @@ const deleteEmployee = async (req, res) => {
 
 const toggleStatus = async (req, res) => {
   try {
+    if (!isManagerUser(req.user)) {
+      return res.status(403).json({ message: "Access denied. Managers only." });
+    }
     const ref = col().doc(req.params.id);
     const doc = await ref.get();
     if (!doc.exists) return res.status(404).json({ message: "Employee not found" });

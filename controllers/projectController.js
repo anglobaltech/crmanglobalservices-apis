@@ -137,34 +137,48 @@ const HALLMARKING_STAGES = [
     steps: [{ id: "hm_license_granted", label: "Hallmarking License Granted", type: "step" }],
   },
 ];
-
+ 
 const HALLMARKING_REQUIRED_DOCUMENTS = [
-  { id: "doc_hm_1",  label: "GST", type: "file", description: "GST registration certificate of the center/business. Required for identity and tax compliance verification by BIS.", uploadedBy: "Client side" },
-  { id: "doc_hm_2",  label: "Proof of Identity of Signatory (Aadhar Card of Owner)", type: "file", description: "Aadhar card of the business owner or authorized signatory. Used as official identity proof for BIS registration.", uploadedBy: "Client side" },
-  { id: "doc_hm_3",  label: "XRF Detection Letter", type: "file", description: "Official letter confirming the presence and working condition of the XRF (X-Ray Fluorescence) machine at the center.", uploadedBy: "Client side" },
-  { id: "doc_hm_4",  label: "CRM (Certified Reference Material)", type: "file", description: "Certificate or record of Certified Reference Material used for XRF machine calibration and accuracy verification.", uploadedBy: "Client side or both side" },
-  { id: "doc_hm_5",  label: "SRM (Standard Reference Material)", type: "file", description: "Certificate or record of Standard Reference Material used alongside CRM for quality assurance of testing equipment.", uploadedBy: "Client side or both side" },
-  { id: "doc_hm_6",  label: "XRF Calibration Certificate", type: "file", description: "Valid calibration certificate from an accredited lab for the XRF machine installed at the hallmarking center.", uploadedBy: "Client side" },
-  { id: "doc_hm_7",  label: "Rent Agreement / CA Certificate", type: "file", description: "Premises document — either a registered rent agreement or a CA certificate confirming the center address.", uploadedBy: "Client side" },
-  { id: "doc_hm_8",  label: "Logo of Center", type: "file", description: "Official logo/trademark of the hallmarking center, required for BIS registration and license display.", uploadedBy: "Both side" },
-  { id: "doc_hm_9",  label: "Layout Plan", type: "file", description: "Scaled layout/floor plan of the hallmarking center showing equipment placement, work areas, and dimensions.", uploadedBy: "My side" },
-  { id: "doc_hm_10", label: "Form V, Agreement between BIS and Center, Indemnity Bond", type: "file", description: "Three documents on stamp paper: Form V (application), BIS-Center agreement, and indemnity bond — all duly signed and stamped by the client.", uploadedBy: "Three stamp paper — Client side" },
-  { id: "doc_hm_11", label: "ILC (Inter-Laboratory Comparison)", type: "file", description: "Inter-Laboratory Comparison report demonstrating the center's testing accuracy against a reference lab as mandated by BIS.", uploadedBy: "My side" },
-  { id: "doc_hm_12", label: "Insurance", type: "file", description: "Insurance policy document covering the hallmarking center premises and equipment as required by BIS norms.", uploadedBy: "Both side" },
-  { id: "doc_hm_13", label: "Location Plan", type: "file", description: "Map/location plan showing the geographic location of the hallmarking center relative to nearby landmarks.", uploadedBy: "My side" },
-  { id: "doc_hm_14", label: "Quality Manual", type: "file", description: "Documented quality manual outlining the standard operating procedures, quality objectives, and processes of the center.", uploadedBy: "My side" },
-  { id: "doc_hm_15", label: "List of Employees + Aadhaar Card + Degree of Assaying Master", type: "file", description: "Employee list with Aadhaar cards and professional degree certificate of the designated Assaying & Hallmarking Master.", uploadedBy: "Client side" },
-  { id: "doc_hm_16", label: "Pollution Certificate", type: "file", description: "Valid pollution/NOC certificate from the appropriate state pollution control board for the center's operations.", uploadedBy: "Both side" },
-  { id: "doc_hm_17", label: "List of Equipment", type: "file", description: "Detailed list of all equipment at the center including make, model, and serial numbers (XRF, laser, micro-balance, etc.).", uploadedBy: "My side" },
-  { id: "doc_hm_18", label: "Electric Meter No.", type: "text", description: "Electricity connection meter number of the hallmarking center premises for address and utility verification.", placeholder: "Enter electric meter number...", uploadedBy: "Client side" },
-  { id: "doc_hm_19", label: "Area of Center (in sq. ft.)", type: "text", description: "Total area of the hallmarking center in square feet, required to verify minimum space compliance as per BIS norms.", placeholder: "e.g. 500 sq. ft.", uploadedBy: "Client side" },
-  { id: "doc_hm_20", label: "Authorized Signatory Aadhar Card", type: "file", description: "Aadhar card of the person authorized to sign BIS-related documents on behalf of the center.", uploadedBy: "Client side" },
-  { id: "doc_hm_21", label: "Current Location (Geo-tagged Photo)", type: "file", description: "Geo-tagged photograph or Google Maps screenshot showing the current physical location of the hallmarking center.", uploadedBy: "Client side" },
-  { id: "doc_hm_22", label: "Calibration Certificate (All Equipment)", type: "file", description: "Valid calibration certificates for all testing and weighing equipment at the center (micro-balance, weights, etc.).", uploadedBy: "Both side" },
-  { id: "doc_hm_23", label: "Integration of XRF Machine, Laser Machine, Micro Balance", type: "file", description: "Integration report confirming that the XRF machine, laser marking machine, and micro-balance are properly set up and operational.", uploadedBy: "Client side" },
-  { id: "doc_hm_24", label: "Pollution Certificate with Hazardous Agreement", type: "file", description: "Pollution certificate combined with a hazardous waste disposal agreement for centers handling chemical/acid processes.", uploadedBy: "Client side" },
-  { id: "doc_hm_25", label: "PT (Proficiency Testing)", type: "file", description: "Proficiency Testing report from an accredited provider demonstrating the center's competency in gold assaying.", uploadedBy: "Both side" },
-  { id: "doc_hm_26", label: "Security Guard", type: "file", description: "Agreement or appointment letter from a licensed security agency for deployment of a security guard at the hallmarking center.", uploadedBy: "Client side" },
+  { id: "doc_hm_1",  label: "GST", type: "file", section: "General Documents" },
+  { id: "doc_hm_2",  label: "Proof of Identity of Signatory (Aadhar Card of Owner)", type: "file", section: "General Documents" },
+  { id: "doc_hm_3",  label: "XRF Detection Letter", type: "file", section: "General Documents" },
+  { id: "doc_hm_7",  label: "Rent Agreement / CA Certificate", type: "file", section: "General Documents" },
+  { id: "doc_hm_8",  label: "Logo of Center", type: "file", section: "General Documents" },
+  { id: "doc_hm_9",  label: "Layout Plan", type: "file", section: "General Documents" },
+  { id: "doc_hm_10", label: "Form V, Agreement between BIS and Center, Indemnity Bond", type: "file", section: "General Documents" },
+  { id: "doc_hm_11", label: "ILC (Inter-Laboratory Comparison)", type: "file", section: "General Documents" },
+  { id: "doc_hm_12", label: "Insurance", type: "file", section: "Insurance & PT", requiresValidity: true },
+  { id: "doc_hm_13", label: "Location Plan", type: "file", section: "General Documents" },
+  { id: "doc_hm_14", label: "Quality Manual", type: "file", section: "General Documents" },
+  { id: "doc_hm_15", label: "List of Employees + Aadhaar Card + Degree of Assaying Master", type: "file", section: "General Documents" },
+  { id: "doc_hm_16", label: "Pollution Certificate", type: "file", section: "General Documents" },
+  { id: "doc_hm_17", label: "List of Equipment", type: "file", section: "General Documents" },
+  { id: "doc_hm_18", label: "Electric Meter No.", type: "text", section: "General Documents" },
+  { id: "doc_hm_19", label: "Area of Center (in sq. ft.)", type: "text", section: "General Documents" },
+  { id: "doc_hm_20", label: "Authorized Signatory Aadhar Card", type: "file", section: "General Documents" },
+  { id: "doc_hm_21", label: "Current Location (Geo-tagged Photo)", type: "file", section: "General Documents" },
+  { id: "doc_hm_23", label: "Integration of XRF Machine, Laser Machine, Micro Balance", type: "file", section: "General Documents" },
+  { id: "doc_hm_24", label: "Pollution Certificate with Hazardous Agreement", type: "file", section: "General Documents" },
+  { id: "doc_hm_25", label: "PT (Proficiency Testing)", type: "file", section: "General Documents" },
+  { id: "doc_hm_26", label: "Security Guard", type: "file", section: "General Documents" },
+  { id: "hm_crm_gold", label: "CRM Gold", type: "file", section: "CRM Documents" },
+  { id: "hm_crm_silver", label: "CRM Silver", type: "file", section: "CRM Documents" },
+  { id: "hm_crm_copper", label: "CRM Copper", type: "file", section: "CRM Documents" },
+  { id: "hm_crm_lead", label: "CRM Lead", type: "file", section: "CRM Documents" },
+  { id: "hm_srm_g_995", label: "SRM Gold 995", type: "file", section: "SRM Documents (Gold)" },
+  { id: "hm_srm_g_958", label: "SRM Gold 958", type: "file", section: "SRM Documents (Gold)" },
+  { id: "hm_srm_g_916", label: "SRM Gold 916", type: "file", section: "SRM Documents (Gold)" },
+  { id: "hm_srm_g_833", label: "SRM Gold 833", type: "file", section: "SRM Documents (Gold)" },
+  { id: "hm_srm_g_750", label: "SRM Gold 750", type: "file", section: "SRM Documents (Gold)" },
+  { id: "hm_srm_g_585", label: "SRM Gold 585", type: "file", section: "SRM Documents (Gold)" },
+  { id: "hm_srm_g_375", label: "SRM Gold 375", type: "file", section: "SRM Documents (Gold)" },
+  { id: "hm_srm_s_970", label: "SRM Silver 970", type: "file", section: "SRM Documents (Silver)" },
+  { id: "hm_srm_s_925", label: "SRM Silver 925", type: "file", section: "SRM Documents (Silver)" },
+  { id: "hm_srm_s_900", label: "SRM Silver 900", type: "file", section: "SRM Documents (Silver)" },
+  { id: "hm_srm_s_835", label: "SRM Silver 835", type: "file", section: "SRM Documents (Silver)" },
+  { id: "hm_srm_s_800", label: "SRM Silver 800", type: "file", section: "SRM Documents (Silver)" },
+  { id: "hm_pt_gold", label: "PT Gold", type: "file", section: "Insurance & PT", requiresValidity: true },
+  { id: "hm_pt_silver", label: "PT Silver", type: "file", section: "Insurance & PT", requiresValidity: true }
 ];
 
 const PROJECT_CHECKLISTS = {
@@ -275,8 +289,8 @@ const getNextProjectId = async (serviceType) => {
 const serializeProject = (id, data) => ({
   id,
   ...data,
-  createdAt: data.createdAt?.toDate?.()?.toISOString() || null,
-  updatedAt: data.updatedAt?.toDate?.()?.toISOString() || null,
+  createdAt: data.createdAt?.toDate?.()?.toISOString() || data.createdAt || null,
+  updatedAt: data.updatedAt?.toDate?.()?.toISOString() || data.updatedAt || null,
   dueDate: data.dueDate?.toDate?.()?.toISOString() || data.dueDate || null,
   checklist: (data.checklist || []).map((item) => ({
     ...item,
@@ -384,21 +398,69 @@ const buildFmcsStages = () => [
   },
 ];
 
+const FMCS_DOC_SLOTS = [
+  // Standard FMCS Checklist Documents
+  { id: "fmcs_doc_1",  label: "Government document addressing factory", type: "file", section: "FMCS Documents" },
+  { id: "fmcs_doc_2",  label: "Authorization letter for BIS Signatory", type: "file", section: "FMCS Documents" },
+  { id: "fmcs_doc_3",  label: "Authorization letter for Indian representative with Aadhar Card", type: "file", section: "FMCS Documents" },
+  { id: "fmcs_doc_4",  label: "List of machinery", type: "file", section: "FMCS Documents" },
+  { id: "fmcs_doc_5",  label: "List of testing equipment", type: "file", section: "FMCS Documents" },
+  { id: "fmcs_doc_6",  label: "List of raw material", type: "file", section: "FMCS Documents" },
+  { id: "fmcs_doc_7",  label: "Process flow chart", type: "file", section: "FMCS Documents" },
+  { id: "fmcs_doc_8",  label: "Layout plan", type: "file", section: "FMCS Documents" },
+  { id: "fmcs_doc_9",  label: "Location Plan", type: "file", section: "FMCS Documents" },
+  { id: "fmcs_doc_10", label: "Appointment letter of Quality in charge", type: "file", section: "FMCS Documents" },
+  { id: "fmcs_doc_11", label: "Payment receipt in USD (except Nepal country)", type: "file", section: "FMCS Documents" },
+  { id: "fmcs_doc_12", label: "Raw material certificate", type: "file", section: "FMCS Documents" },
+  { id: "fmcs_doc_13", label: "Factory test report", type: "file", section: "FMCS Documents" },
+  { id: "fmcs_doc_14", label: "English translator person present at the time of audit", type: "file", section: "FMCS Documents" },
+  { id: "fmcs_doc_15", label: "Nomination", type: "file", section: "FMCS Documents" },
+  { id: "fmcs_doc_16", label: "Agreement", type: "file", section: "FMCS Documents" },
+  { id: "fmcs_doc_17", label: "Letter head of company", type: "file", section: "FMCS Documents" },
+  // AIR (Authorized Indian Representative) Details
+  { id: "fmcs_air_1",  label: "AIR Full Name (Authorized Indian Representative)", type: "text", section: "AIR Details", placeholder: "Enter AIR full name..." },
+  { id: "fmcs_air_2",  label: "AIR Aadhar Card", type: "file", section: "AIR Details" },
+  { id: "fmcs_air_3",  label: "AIR Qualification Certificate", type: "file", section: "AIR Details" },
+  { id: "fmcs_air_4",  label: "AIR Agreement signed with BIS", type: "file", section: "AIR Details" },
+  // BIS Bank Guarantee
+  { id: "fmcs_bg_1",   label: "BIS Bank Guarantee Document", type: "file", section: "BIS Bank Guarantee" },
+];
+
+const buildFmcsDocSlots = () =>
+  FMCS_DOC_SLOTS.map((doc) => ({
+    ...doc,
+    file: null,
+    value: doc.type !== "file" ? "" : null,
+  }));
+
 exports.getProjects = asyncHandler(async (req, res) => {
   const { serviceType, status, search, page = 1, pageSize = 20 } = req.query;
   const isManager = isManagerUser(req.user);
+  
+  const start = (parseInt(page) - 1) * parseInt(pageSize);
+  const lim = parseInt(pageSize);
 
-  const snap = await db.collection("projects").get();
-  let projects = snap.docs
-    .map((d) => serializeProject(d.id, d.data()))
-    .filter((p) => p.isDeleted !== true);
+  let baseQuery = db.collection("projects").where("isDeleted", "!=", true);
+  if (serviceType) baseQuery = baseQuery.where("serviceType", "==", serviceType);
+  if (status) baseQuery = baseQuery.where("status", "==", status);
+
+  if (isManager && !search) {
+    const [totalSnap, snap] = await Promise.all([
+      baseQuery.count().get(),
+      baseQuery.orderBy("createdAt", "desc").offset(start).limit(lim).get()
+    ]);
+    const projects = snap.docs.map(d => serializeProject(d.id, d.data()));
+    return res.json({ projects, total: totalSnap.data().count, page: parseInt(page), pageSize: lim });
+  }
+
+  // Fallback to in-memory processing for search or complex access rights
+  const snap = await baseQuery.get();
+  let projects = snap.docs.map((d) => serializeProject(d.id, d.data()));
 
   if (!isManager) {
     projects = projects.filter((p) => canAccessProject(req.user, p));
   }
 
-  if (serviceType) projects = projects.filter((p) => p.serviceType === serviceType);
-  if (status) projects = projects.filter((p) => p.status === status);
   if (search) {
     const q = search.toLowerCase();
     projects = projects.filter((p) =>
@@ -411,16 +473,15 @@ exports.getProjects = asyncHandler(async (req, res) => {
   projects.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
 
   const total = projects.length;
-  const start = (parseInt(page) - 1) * parseInt(pageSize);
-  const paginated = projects.slice(start, start + parseInt(pageSize));
+  const paginated = projects.slice(start, start + lim);
 
-  res.json({ projects: paginated, total, page: parseInt(page), pageSize: parseInt(pageSize) });
+  res.json({ projects: paginated, total, page: parseInt(page), pageSize: lim });
 });
 
 exports.getProjectStats = asyncHandler(async (req, res) => {
   const isManager = isManagerUser(req.user);
-  const snap = await db.collection("projects").get();
-  let projects = snap.docs.map((d) => d.data()).filter((p) => p.isDeleted !== true);
+  const snap = await db.collection("projects").where("isDeleted", "!=", true).get();
+  let projects = snap.docs.map((d) => d.data());
 
   if (!isManager) {
     projects = projects.filter((p) => canAccessProject(req.user, p));
@@ -479,8 +540,6 @@ exports.getProjectById = asyncHandler(async (req, res) => {
       }
     }
     if (Object.keys(migrations).length > 0) {
-      migrations.updatedAt = new Date();
-      await docRef.update(migrations);
       data = { ...data, ...migrations };
     }
   }
@@ -502,8 +561,6 @@ exports.getProjectById = asyncHandler(async (req, res) => {
       }
     }
     if (Object.keys(migrations).length > 0) {
-      migrations.updatedAt = new Date();
-      await docRef.update(migrations);
       data = { ...data, ...migrations };
     }
   }
@@ -523,10 +580,30 @@ exports.getProjectById = asyncHandler(async (req, res) => {
       } else {
         migrations.isiDocSlots = buildHallmarkingDocSlots();
       }
+    } else {
+      let updatedSlots = [...data.isiDocSlots];
+      let needsMigration = false;
+      HALLMARKING_REQUIRED_DOCUMENTS.forEach((docDef) => {
+        if (!updatedSlots.find(s => s.id === docDef.id)) {
+          updatedSlots.push({ ...docDef, file: null });
+          needsMigration = true;
+        }
+      });
+      const deprecated = ['doc_hm_4', 'doc_hm_5', 'doc_hm_6', 'doc_hm_22'];
+      const filteredSlots = updatedSlots.filter(s => {
+        if (deprecated.includes(s.id)) {
+          if (!s.file && (!s.value || s.value === "")) {
+            needsMigration = true;
+            return false;
+          }
+        }
+        return true;
+      });
+      if (needsMigration) {
+        migrations.isiDocSlots = filteredSlots;
+      }
     }
     if (Object.keys(migrations).length > 0) {
-      migrations.updatedAt = new Date();
-      await docRef.update(migrations);
       data = { ...data, ...migrations };
     }
   }
@@ -536,9 +613,22 @@ exports.getProjectById = asyncHandler(async (req, res) => {
     if (!data.isCodes || data.isCodes.length === 0) {
       migrations.isCodes = [{ code: data.isCode || "", stages: buildFmcsStages() }];
     }
+    if (!data.isiDocSlots || data.isiDocSlots.length === 0) {
+      migrations.isiDocSlots = buildFmcsDocSlots();
+    }
+    if (data.totalPaymentNeeded === undefined) {
+      migrations.totalPaymentNeeded = null;
+    }
+    if (!data.payments) {
+      migrations.payments = [];
+    }
+    if (data.fmcsCertValidityDate === undefined) {
+      migrations.fmcsCertValidityDate = null;
+    }
+    if (data.bankGuaranteeValidityDate === undefined) {
+      migrations.bankGuaranteeValidityDate = null;
+    }
     if (Object.keys(migrations).length > 0) {
-      migrations.updatedAt = new Date();
-      await docRef.update(migrations);
       data = { ...data, ...migrations };
     }
   }
@@ -615,7 +705,7 @@ exports.createProject = asyncHandler(async (req, res) => {
     projectName,
     clientName,
     serviceType,
-    status: assignedArr.length > 0 ? "in_progress" : "pending",
+    status: "in_progress",
     assignedTo: assignedArr,
     assignedToNames: assignedNamesArr,
     assignedBy: req.user.id,
@@ -629,7 +719,7 @@ exports.createProject = asyncHandler(async (req, res) => {
     isCode: isCode || "",
     isCodes: isCodesArray,
     isiStages: isCodesArray.length > 0 ? isCodesArray[0].stages : buildStages(), // legacy fallback
-    isiDocSlots: isIsi ? buildIsiDocSlots() : isBisCrs ? buildBisCrsDocSlots() : isHallmarking ? buildHallmarkingDocSlots() : [],
+    isiDocSlots: isIsi ? buildIsiDocSlots() : isBisCrs ? buildBisCrsDocSlots() : isHallmarking ? buildHallmarkingDocSlots() : isFmcs ? buildFmcsDocSlots() : [],
     checklist: usesStages ? [] : (PROJECT_CHECKLISTS[serviceType] || []).map((item) => ({
       ...item,
       done: false,
@@ -638,6 +728,12 @@ exports.createProject = asyncHandler(async (req, res) => {
       doneAt: null,
     })),
     documents: [],
+    // Payment tracking
+    totalPaymentNeeded: null,
+    payments: [],
+    // FMCS-specific
+    fmcsCertValidityDate: null,
+    bankGuaranteeValidityDate: null,
     createdBy: req.user.id,
     createdByName: userName(req.user),
     createdAt: new Date(),
@@ -679,11 +775,85 @@ exports.updateProject = asyncHandler(async (req, res) => {
   const updates = { updatedAt: new Date() };
   const activityLogs = [];
 
-  if (isManager) {
-    ["projectName", "clientName", "serviceType", "notes", "address", "name", "phone", "email"].forEach((f) => {
-      if (req.body[f] !== undefined) updates[f] = req.body[f];
+  // Payment fields — accessible to all assigned users
+  if (req.body.totalPaymentNeeded !== undefined && req.body.totalPaymentNeeded !== prev.totalPaymentNeeded) {
+    updates.totalPaymentNeeded = req.body.totalPaymentNeeded !== null ? Number(req.body.totalPaymentNeeded) : null;
+    activityLogs.push({
+      type: "remark",
+      message: `Total Payment Needed set to ₹${Number(req.body.totalPaymentNeeded).toLocaleString("en-IN")}`,
+      performedBy: req.user.id, performedByName: userName(req.user),
+      createdAt: new Date(),
     });
+  }
+
+  // Validity dates — managers only
+  if (isManager) {
+    if (req.body.certValidityDate !== undefined && req.body.certValidityDate !== prev.certValidityDate) {
+      updates.certValidityDate = req.body.certValidityDate || null;
+      const formattedDate = updates.certValidityDate ? new Date(updates.certValidityDate).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : "Not set";
+      activityLogs.push({
+        type: "remark",
+        message: `Certificate Validity Date updated to ${formattedDate}`,
+        performedBy: req.user.id, performedByName: userName(req.user),
+        createdAt: new Date(),
+      });
+    }
+    // Legacy FMCS cert validity date
+    if (req.body.fmcsCertValidityDate !== undefined && req.body.fmcsCertValidityDate !== prev.fmcsCertValidityDate) {
+      updates.fmcsCertValidityDate = req.body.fmcsCertValidityDate || null;
+      const formattedDate = updates.fmcsCertValidityDate ? new Date(updates.fmcsCertValidityDate).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : "Not set";
+      activityLogs.push({
+        type: "remark",
+        message: `FMCS Certificate Validity Date updated to ${formattedDate}`,
+        performedBy: req.user.id, performedByName: userName(req.user),
+        createdAt: new Date(),
+      });
+    }
+    if (req.body.bankGuaranteeValidityDate !== undefined && req.body.bankGuaranteeValidityDate !== prev.bankGuaranteeValidityDate) {
+      updates.bankGuaranteeValidityDate = req.body.bankGuaranteeValidityDate || null;
+      const formattedDate = updates.bankGuaranteeValidityDate ? new Date(updates.bankGuaranteeValidityDate).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : "Not set";
+      activityLogs.push({
+        type: "remark",
+        message: `BIS Bank Guarantee Validity Date updated to ${formattedDate}`,
+        performedBy: req.user.id, performedByName: userName(req.user),
+        createdAt: new Date(),
+      });
+    }
+  }
+
+  if (isManager) {
+    const fieldLabels = {
+      projectName: "Company Name",
+      clientName: "Client Name",
+      serviceType: "Service Type",
+      notes: "Notes",
+      address: "Address",
+      name: "Contact Name",
+      phone: "Phone",
+      email: "Email"
+    };
+
+    ["projectName", "clientName", "serviceType", "notes", "address", "name", "phone", "email"].forEach((f) => {
+      if (req.body[f] !== undefined && req.body[f] !== prev[f]) {
+        updates[f] = req.body[f];
+        activityLogs.push({
+          type: "remark",
+          message: `${fieldLabels[f]} updated to "${req.body[f]}"`,
+          performedBy: req.user.id, performedByName: userName(req.user),
+          createdAt: new Date(),
+        });
+      }
+    });
+
     if (req.body.isCode !== undefined) {
+      if (req.body.isCode !== prev.isCode) {
+        activityLogs.push({
+          type: "remark",
+          message: `IS Code updated to "${req.body.isCode}"`,
+          performedBy: req.user.id, performedByName: userName(req.user),
+          createdAt: new Date(),
+        });
+      }
       updates.isCode = req.body.isCode;
       const newCodes = req.body.isCode.split(',').map(c => c.trim()).filter(Boolean);
       if (newCodes.length === 0) newCodes.push("");
@@ -745,6 +915,7 @@ exports.updateProject = asyncHandler(async (req, res) => {
 
   if (req.body.documents !== undefined) updates.documents = req.body.documents;
   if (req.body.isiDocSlots !== undefined) updates.isiDocSlots = req.body.isiDocSlots;
+  if (req.body.calibrationDocs !== undefined) updates.calibrationDocs = req.body.calibrationDocs;
 
   await db.collection("projects").doc(req.params.id).update(updates);
 
@@ -828,6 +999,15 @@ exports.toggleIsiStep = asyncHandler(async (req, res) => {
         if (step.type === "date" && dateValue !== undefined) {
           step.dateValue = dateValue || null;
         }
+        if (remark && remark.trim()) {
+          if (!step.remarks) step.remarks = [];
+          step.remarks.push({
+            message: remark.trim(),
+            addedBy: req.user.id,
+            addedByName: userName(req.user),
+            addedAt: new Date().toISOString()
+          });
+        }
         break;
       }
     }
@@ -888,11 +1068,78 @@ exports.addRemark = asyncHandler(async (req, res) => {
 
   if (!message || !message.trim()) throw new ApiError(400, "message is required");
 
-  const doc = await db.collection("projects").doc(id).get();
-  if (!doc.exists) throw new ApiError(404, "Project not found");
-  if (!canAccessProject(req.user, doc.data())) throw new ApiError(403, "Access denied");
+  const docRef = db.collection("projects").doc(id);
+  const doc = await docRef.get();
+  if (!doc.exists || doc.data().isDeleted) throw new ApiError(404, "Project not found");
+  
+  const data = doc.data();
+  if (!canAccessProject(req.user, data)) throw new ApiError(403, "Access denied");
 
-  const ref = await db.collection("projects").doc(id).collection("activity").add({
+  let updatedStages = false;
+  
+  // If stepId is provided, we should attach the remark to the specific step in the project document
+  if (stepId) {
+    const isCodes = data.isCodes || [];
+    let found = false;
+    
+    // First try to find in isCodes
+    for (const codeObj of isCodes) {
+      if (codeObj.stages) {
+        for (const stage of codeObj.stages) {
+          if (stage.steps) {
+            for (const step of stage.steps) {
+              if (step.id === stepId) {
+                if (!step.remarks) step.remarks = [];
+                step.remarks.push({
+                  message: message.trim(),
+                  addedBy: req.user.id,
+                  addedByName: userName(req.user),
+                  addedAt: new Date().toISOString()
+                });
+                found = true;
+                break;
+              }
+            }
+          }
+          if (found) break;
+        }
+      }
+      if (found) break;
+    }
+    
+    // Fallback for older projects without isCodes (just isiStages)
+    if (!found && data.isiStages) {
+      const isiStages = data.isiStages;
+      for (const stage of isiStages) {
+        if (stage.steps) {
+          for (const step of stage.steps) {
+            if (step.id === stepId) {
+              if (!step.remarks) step.remarks = [];
+              step.remarks.push({
+                message: message.trim(),
+                addedBy: req.user.id,
+                addedByName: userName(req.user),
+                addedAt: new Date().toISOString()
+              });
+              found = true;
+              break;
+            }
+          }
+        }
+        if (found) break;
+      }
+      if (found) {
+        await docRef.update({ isiStages, updatedAt: new Date() });
+        updatedStages = true;
+      }
+    }
+    
+    if (found && !updatedStages) {
+      await docRef.update({ isCodes, updatedAt: new Date() });
+    }
+  }
+
+  const ref = await docRef.collection("activity").add({
     type: "remark",
     stepId: stepId || null,
     stepLabel: stepLabel || null,
@@ -929,3 +1176,74 @@ exports.deleteProject = asyncHandler(async (req, res) => {
 
   res.json({ success: true, message: "Project deleted successfully" });
 });
+
+exports.addPaymentInstallment = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const { amount, date, note, referenceId, excessReason } = req.body;
+  if (!amount || isNaN(Number(amount)) || Number(amount) <= 0) {
+    throw new ApiError(400, "A valid positive amount is required");
+  }
+
+  const docRef = db.collection("projects").doc(id);
+  const doc = await docRef.get();
+  if (!doc.exists || doc.data().isDeleted) throw new ApiError(404, "Project not found");
+  if (!canAccessProject(req.user, doc.data())) throw new ApiError(403, "Access denied");
+
+  const installment = {
+    id: Date.now().toString(),
+    amount: Number(amount),
+    date: date || new Date().toISOString().split("T")[0],
+    note: note || "",
+    referenceId: referenceId || "",
+    excessReason: excessReason || "",
+    addedBy: req.user.id,
+    addedByName: userName(req.user),
+    addedAt: new Date().toISOString(),
+  };
+
+  const existing = doc.data().payments || [];
+  const updated = [...existing, installment];
+  await docRef.update({ payments: updated, updatedAt: new Date() });
+
+  let msg = `Payment of ₹${Number(amount).toLocaleString("en-IN")} received`;
+  if (referenceId) msg += ` (Ref: ${referenceId})`;
+  if (note) msg += ` — ${note}`;
+  if (excessReason) msg += ` [Extra Payment Reason: ${excessReason}]`;
+
+  await db.collection("projects").doc(id).collection("activity").add({
+    type: "payment",
+    message: msg,
+    performedBy: req.user.id,
+    performedByName: userName(req.user),
+    createdAt: new Date(),
+  });
+
+  res.status(201).json({ installment, message: "Payment installment added" });
+});
+
+exports.deletePaymentInstallment = asyncHandler(async (req, res) => {
+  if (!isManagerUser(req.user)) throw new ApiError(403, "Managers only");
+  const { id, installmentId } = req.params;
+  const docRef = db.collection("projects").doc(id);
+  const doc = await docRef.get();
+  if (!doc.exists || doc.data().isDeleted) throw new ApiError(404, "Project not found");
+
+  const deletedPayment = (doc.data().payments || []).find(p => p.id === installmentId);
+  const payments = (doc.data().payments || []).filter(p => p.id !== installmentId);
+  await docRef.update({ payments, updatedAt: new Date() });
+  
+  if (deletedPayment) {
+    await db.collection("projects").doc(id).collection("activity").add({
+      type: "payment",
+      message: `Payment of ₹${Number(deletedPayment.amount).toLocaleString("en-IN")} was removed`,
+      performedBy: req.user.id,
+      performedByName: userName(req.user),
+      createdAt: new Date(),
+    });
+  }
+  
+  res.json({ success: true, message: "Installment removed" });
+});
+
+
+

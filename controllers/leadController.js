@@ -7,6 +7,12 @@ const normalizePhone = (phone) => {
   return String(phone).replace(/\D/g, "").replace(/^91/, "").replace(/^0+/, "");
 };
 
+const isManagerUser = (user) => {
+  if (!user) return false;
+  const role = (user.roleName || "").toLowerCase();
+  return role === "super admin" || role === "admin" || role === "director" || role === "founder & ceo" || role.includes("manager") || user.department === "management" || user.permissions?.leads === true;
+};
+
 const getNextLeadId = async () => {
   const ref = db.collection("counters").doc("leads");
   return await db.runTransaction(async (t) => {
@@ -253,6 +259,9 @@ exports.updateLead = async (req, res) => {
 // PATCH /api/leads/:id/assign
 exports.assignLead = async (req, res) => {
   try {
+    if (!isManagerUser(req.user)) {
+      return res.status(403).json({ error: "Access denied. Managers only." });
+    }
     const { id } = req.params;
     const { assignedTo, assignedToName } = req.body;
     if (!assignedTo) return res.status(400).json({ error: "assignedTo is required" });
@@ -274,6 +283,9 @@ exports.assignLead = async (req, res) => {
 // PATCH /api/leads/bulk-assign
 exports.bulkAssign = async (req, res) => {
   try {
+    if (!isManagerUser(req.user)) {
+      return res.status(403).json({ error: "Access denied. Managers only." });
+    }
     const { leadIds, assignedTo, assignedToName } = req.body;
     if (!leadIds?.length || !assignedTo)
       return res.status(400).json({ error: "leadIds and assignedTo are required" });
@@ -299,6 +311,9 @@ exports.bulkAssign = async (req, res) => {
 // DELETE /api/leads/:id
 exports.deleteLead = async (req, res) => {
   try {
+    if (!isManagerUser(req.user)) {
+      return res.status(403).json({ error: "Access denied. Managers only." });
+    }
     await db.collection("leads").doc(req.params.id).delete();
     res.json({ success: true });
   } catch (err) {
@@ -307,6 +322,9 @@ exports.deleteLead = async (req, res) => {
 };
 
 exports.bulkDelete = async (req, res) => {
+  if (!isManagerUser(req.user)) {
+    return res.status(403).json({ error: "Access denied. Managers only." });
+  }
   const { leadIds } = req.body;
   const batch = db.batch();
   leadIds.forEach((id) => batch.delete(db.collection("leads").doc(id)));

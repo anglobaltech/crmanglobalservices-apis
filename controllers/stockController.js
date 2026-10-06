@@ -5,6 +5,12 @@ const { uploadBase64File } = require("../utils/storageHelper");
 
 async function getNextId(counterDoc, prefix) {
   const ref = db.collection("counters").doc(counterDoc);
+
+const isManagerUser = (user) => {
+  if (!user) return false;
+  const role = (user.roleName || "").toLowerCase();
+  return role === "super admin" || role === "admin" || role === "director" || role === "founder & ceo" || role.includes("manager") || user.department === "management" || user.permissions?.stock === true;
+};
   return await db.runTransaction(async (t) => {
     const snap = await t.get(ref);
     const next = snap.exists ? (snap.data().count || 0) + 1 : 1;
@@ -163,7 +169,17 @@ exports.updateGateEntry = asyncHandler(async (req, res) => {
   const ref = db.collection("stockGateEntries").doc(req.params.id);
   const doc = await ref.get();
   if (!doc.exists) throw new ApiError(404, "Gate entry not found");
-  await ref.update({ ...req.body, updatedAt: new Date() });
+
+  const folder = `stockmanagement/gateentry/${doc.data().gateEntryId || req.params.id}`;
+  const updates = { ...req.body, updatedAt: new Date() };
+
+  if (updates.coaFile && String(updates.coaFile).startsWith("data:")) updates.coaFile = await uploadBase64File(updates.coaFile, folder, "coaFile");
+  if (updates.driverPhoto && String(updates.driverPhoto).startsWith("data:")) updates.driverPhoto = await uploadBase64File(updates.driverPhoto, folder, "driverPhoto");
+  if (updates.gateOpeningVideo && String(updates.gateOpeningVideo).startsWith("data:")) updates.gateOpeningVideo = await uploadBase64File(updates.gateOpeningVideo, folder, "gateOpeningVideo");
+  if (updates.productVideo && String(updates.productVideo).startsWith("data:")) updates.productVideo = await uploadBase64File(updates.productVideo, folder, "productVideo");
+  if (updates.productPhoto && String(updates.productPhoto).startsWith("data:")) updates.productPhoto = await uploadBase64File(updates.productPhoto, folder, "productPhoto");
+
+  await ref.update(updates);
   res.json({ message: "Gate entry updated" });
 });
 
@@ -286,7 +302,14 @@ exports.updateStockEntry = asyncHandler(async (req, res) => {
   const ref = db.collection("stockEntries").doc(req.params.id);
   const doc = await ref.get();
   if (!doc.exists) throw new ApiError(404, "Stock entry not found");
-  await ref.update({ ...req.body, updatedAt: new Date() });
+
+  const folder = `stockmanagement/stockentry/${doc.data().stockEntryId || req.params.id}`;
+  const updates = { ...req.body, updatedAt: new Date() };
+
+  if (updates.rejectedItemPhoto && String(updates.rejectedItemPhoto).startsWith("data:")) updates.rejectedItemPhoto = await uploadBase64File(updates.rejectedItemPhoto, folder, "rejectedItemPhoto");
+  if (updates.rejectedItemVideo && String(updates.rejectedItemVideo).startsWith("data:")) updates.rejectedItemVideo = await uploadBase64File(updates.rejectedItemVideo, folder, "rejectedItemVideo");
+
+  await ref.update(updates);
   res.json({ message: "Stock entry updated" });
 });
 
@@ -435,7 +458,17 @@ exports.updateStockExit = asyncHandler(async (req, res) => {
   const ref = db.collection("stockExits").doc(req.params.id);
   const doc = await ref.get();
   if (!doc.exists) throw new ApiError(404, "Stock exit not found");
-  await ref.update({ ...req.body, updatedAt: new Date() });
+
+  const folder = `stockmanagement/stockexit/${doc.data().stockExitId || req.params.id}`;
+  const updates = { ...req.body, updatedAt: new Date() };
+
+  if (updates.vehiclePhoto && String(updates.vehiclePhoto).startsWith("data:")) updates.vehiclePhoto = await uploadBase64File(updates.vehiclePhoto, folder, "vehiclePhoto");
+  if (updates.itemPhoto && String(updates.itemPhoto).startsWith("data:")) updates.itemPhoto = await uploadBase64File(updates.itemPhoto, folder, "itemPhoto");
+  if (updates.itemVideo && String(updates.itemVideo).startsWith("data:")) updates.itemVideo = await uploadBase64File(updates.itemVideo, folder, "itemVideo");
+  if (updates.exitPhoto && String(updates.exitPhoto).startsWith("data:")) updates.exitPhoto = await uploadBase64File(updates.exitPhoto, folder, "exitPhoto");
+  if (updates.exitVideo && String(updates.exitVideo).startsWith("data:")) updates.exitVideo = await uploadBase64File(updates.exitVideo, folder, "exitVideo");
+
+  await ref.update(updates);
   res.json({ message: "Stock exit updated" });
 });
 
@@ -478,25 +511,6 @@ const bulkDeleteDocs = async (collectionName, ids) => {
     
     for (const snap of snaps) {
       if (snap.exists) {
-        const data = snap.data();
-        let folderPrefix = "";
-        
-        if (collectionName === "stockGateEntries" && data.gateEntryId) {
-          folderPrefix = `stockmanagement/gateentry/${data.gateEntryId}`;
-        } else if (collectionName === "stockEntries" && data.stockEntryId) {
-          folderPrefix = `stockmanagement/stockentry/${data.stockEntryId}`;
-        } else if (collectionName === "stockExits" && data.stockExitId) {
-          folderPrefix = `stockmanagement/stockexit/${data.stockExitId}`;
-        }
-        
-        if (folderPrefix) {
-          try {
-            await bucket.deleteFiles({ prefix: folderPrefix });
-          } catch (err) {
-            console.error(`Failed to delete storage for ${folderPrefix}`, err);
-          }
-        }
-        
         batch.delete(snap.ref);
       }
     }
@@ -506,6 +520,9 @@ const bulkDeleteDocs = async (collectionName, ids) => {
 };
 
 exports.bulkDeleteGateEntries = asyncHandler(async (req, res) => {
+  if (!isManagerUser(req.user)) {
+    throw new ApiError(403, "Access denied. Managers only.");
+  }
   const { ids } = req.body;
   if (!ids || !Array.isArray(ids)) throw new ApiError(400, "Invalid IDs array");
   await bulkDeleteDocs("stockGateEntries", ids);
@@ -513,6 +530,9 @@ exports.bulkDeleteGateEntries = asyncHandler(async (req, res) => {
 });
 
 exports.bulkDeleteStockEntries = asyncHandler(async (req, res) => {
+  if (!isManagerUser(req.user)) {
+    throw new ApiError(403, "Access denied. Managers only.");
+  }
   const { ids } = req.body;
   if (!ids || !Array.isArray(ids)) throw new ApiError(400, "Invalid IDs array");
   await bulkDeleteDocs("stockEntries", ids);
@@ -520,6 +540,9 @@ exports.bulkDeleteStockEntries = asyncHandler(async (req, res) => {
 });
 
 exports.bulkDeleteStockExits = asyncHandler(async (req, res) => {
+  if (!isManagerUser(req.user)) {
+    throw new ApiError(403, "Access denied. Managers only.");
+  }
   const { ids } = req.body;
   if (!ids || !Array.isArray(ids)) throw new ApiError(400, "Invalid IDs array");
   await bulkDeleteDocs("stockExits", ids);

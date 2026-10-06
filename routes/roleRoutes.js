@@ -12,12 +12,19 @@ const {
   syncAllUsers,
 } = require("../controllers/roleController");
 
+const requireAdmin = (req, res, next) => {
+  if (!req.user || (req.user.roleName !== "admin" && req.user.roleName !== "Super Admin")) {
+    return res.status(403).json({ message: "Admin access required" });
+  }
+  next();
+};
+
 router.post("/seed", seedRoles);              
-router.post("/reseed", verifyToken, reseedRoles); 
-router.post("/sync-users", verifyToken, syncAllUsers); 
+router.post("/reseed", verifyToken, requireAdmin, reseedRoles); 
+router.post("/sync-users", verifyToken, requireAdmin, syncAllUsers); 
 router.get("/", verifyToken, getRoles);
 router.get("/:id", verifyToken, getRoleById);
-router.post("/", verifyToken, createRole);
-router.put("/:id", verifyToken, updateRole);
+router.post("/", verifyToken, requireAdmin, createRole);
+router.put("/:id", verifyToken, requireAdmin, updateRole);
 
 module.exports = router;

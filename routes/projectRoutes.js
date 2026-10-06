@@ -13,6 +13,8 @@ const {
   toggleIsiStep,
   addRemark,
   deleteProject,
+  addPaymentInstallment,
+  deletePaymentInstallment,
 } = require("../controllers/projectController");
 
 router.get("/stats", verifyToken, getProjectStats);
@@ -24,6 +26,8 @@ router.put("/:id", verifyToken, updateProject);
 router.put("/:id/checklist/:itemId", verifyToken, toggleChecklistItem);  
 router.put("/:id/stage/:stepId", verifyToken, toggleIsiStep);       
 router.post("/:id/remark", verifyToken, addRemark);             
+router.post("/:id/payment", verifyToken, addPaymentInstallment);
+router.delete("/:id/payment/:installmentId", verifyToken, deletePaymentInstallment);
 router.delete("/:id", verifyToken, deleteProject);
 
 module.exports = router;

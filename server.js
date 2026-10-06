@@ -1,5 +1,6 @@
 require("dotenv").config();
 const express = require("express");
+const { db } = require("./config/firebase");
 const cors = require("cors");
 const cron = require("node-cron");
 const helmet = require("helmet");
@@ -36,8 +37,10 @@ const corsOptions = {
 };
 app.use(helmet());
 app.use(cors(corsOptions));
-app.use(express.json({ limit: "2mb" }));
-app.use(express.urlencoded({ limit: "2mb", extended: true }));
+app.use(express.json({ limit: "200mb" }));
+app.use(express.urlencoded({ limit: "200mb", extended: true }));
+
+app.set("trust proxy", 1);
 
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, 
@@ -56,6 +59,27 @@ const autoFetchTradeIndiaLeads = async () => {
   const now = Date.now();
   if (now < nextAllowedRunTime) {
     return;
+  }
+
+  // Distributed Lock Mechanism to prevent race conditions across multiple server instances
+  try {
+    const lockRef = db.collection("system").doc("cronLock");
+    const locked = await db.runTransaction(async (t) => {
+      const doc = await t.get(lockRef);
+      if (doc.exists && doc.data().lockedUntil > now) {
+        return false; 
+      }
+      t.set(lockRef, { lockedUntil: now + 4 * 60 * 1000 }, { merge: true });
+      return true;
+    });
+
+    if (!locked) {
+      console.log("Cron skipped: another instance is currently fetching leads.");
+      return;
+    }
+  } catch (error) {
+    console.error("Cron Lock Error:", error.message);
+    return; // Safety fallback: if we can't get lock, don't run
   }
 
   try {
@@ -89,6 +113,7 @@ app.use("/api/services", serviceRoutes);
 app.use("/api/projects", projectRoutes);
 app.use("/api/stock", stockRoutes);
 app.use("/api/employees", employeeRoutes);
+app.use("/api/upload", require("./routes/uploadRoutes"));
 
 app.use(errorHandler);
 
