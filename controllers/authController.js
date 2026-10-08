@@ -115,7 +115,7 @@ exports.loginUser = async (req, res) => {
         profilePic: user.profilePic || null,
       },
       process.env.JWT_SECRET,
-      { expiresIn: "7d" },
+      { expiresIn: "2d" },
     );
 
     res.json({

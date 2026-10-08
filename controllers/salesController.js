@@ -26,7 +26,8 @@ exports.getMyLeads = async (req, res) => {
     let leads = getCache(cacheKey);
 
     if (!leads) {
-      const snapshot = await query.get();
+      // Limit to 1000 to prevent Server OOM crashes and massive DB reads
+      const snapshot = await query.limit(1000).get();
       leads = snapshot.docs.map((doc) => {
         const d = doc.data();
         return {

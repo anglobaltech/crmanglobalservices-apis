@@ -1,16 +1,17 @@
 const { db, bucket } = require("../config/firebase");
+const { AggregateField } = require("firebase-admin/firestore");
 const asyncHandler = require("../utils/asyncHandler");
 const ApiError = require("../utils/ApiError");
 const { uploadBase64File } = require("../utils/storageHelper");
-
-async function getNextId(counterDoc, prefix) {
-  const ref = db.collection("counters").doc(counterDoc);
 
 const isManagerUser = (user) => {
   if (!user) return false;
   const role = (user.roleName || "").toLowerCase();
   return role === "super admin" || role === "admin" || role === "director" || role === "founder & ceo" || role.includes("manager") || user.department === "management" || user.permissions?.stock === true;
 };
+
+async function getNextId(counterDoc, prefix) {
+  const ref = db.collection("counters").doc(counterDoc);
   return await db.runTransaction(async (t) => {
     const snap = await t.get(ref);
     const next = snap.exists ? (snap.data().count || 0) + 1 : 1;
@@ -94,7 +95,7 @@ exports.createGateEntry = asyncHandler(async (req, res) => {
     coaAvailable: coaAvailable ?? null,
     coaDetails: coaDetails || null,
     coaFile: uploadedCoaFile || null,
-    productName: productName || null,
+    productName: productName ? String(productName).trim().toUpperCase() : null,
     packagingDetails: packagingDetails || null,
     quantityKg: quantityKg != null ? Number(quantityKg) : null,
     importedBy: importedBy || null,
@@ -172,6 +173,7 @@ exports.updateGateEntry = asyncHandler(async (req, res) => {
 
   const folder = `stockmanagement/gateentry/${doc.data().gateEntryId || req.params.id}`;
   const updates = { ...req.body, updatedAt: new Date() };
+  if (updates.productName) updates.productName = String(updates.productName).trim().toUpperCase();
 
   if (updates.coaFile && String(updates.coaFile).startsWith("data:")) updates.coaFile = await uploadBase64File(updates.coaFile, folder, "coaFile");
   if (updates.driverPhoto && String(updates.driverPhoto).startsWith("data:")) updates.driverPhoto = await uploadBase64File(updates.driverPhoto, folder, "driverPhoto");
@@ -205,6 +207,12 @@ exports.createStockEntry = asyncHandler(async (req, res) => {
     batchNumber,
     entryDate,
     remarks,
+    amountPerKg,
+    productAmount,
+    gstAmount,
+    expenseAmount,
+    expenseReason,
+    totalAmountWithGst,
   } = req.body;
 
   if (!productName || !String(productName).trim()) {
@@ -219,6 +227,12 @@ exports.createStockEntry = asyncHandler(async (req, res) => {
   if (parsedTotal    !== null && (isNaN(parsedTotal)    || parsedTotal    < 0)) throw new ApiError(400, "Total Billed Qty must be a positive number.");
   if (parsedApproved !== null && (isNaN(parsedApproved) || parsedApproved < 0)) throw new ApiError(400, "Approved Qty must be a positive number.");
   if (isNaN(parsedRejected) || parsedRejected < 0) throw new ApiError(400, "Rejected Qty must be a positive number.");
+  
+  if (parsedTotal !== null && parsedApproved !== null) {
+    if ((parsedApproved + parsedRejected) > parsedTotal) {
+      throw new ApiError(400, `Approved (${parsedApproved}) + Rejected (${parsedRejected}) cannot exceed Total Billed Qty (${parsedTotal}).`);
+    }
+  }
 
   const stockEntryId = await getNextId("stockEntryCounter", "SE");
   const folder = `stockmanagement/stockentry/${stockEntryId}`;
@@ -237,18 +251,25 @@ exports.createStockEntry = asyncHandler(async (req, res) => {
     approvedQty: parsedApproved,
     rejectedQty: parsedRejected,
     rejectionReason: rejectionReason || null,
-    rejectedItemPhoto: uploadedRejectedPhoto || null,
-    rejectedItemVideo: uploadedRejectedVideo || null,
+    rejectedItemPhoto: uploadedRejectedPhoto,
+    rejectedItemVideo: uploadedRejectedVideo,
     witnessName: witnessName || null,
     witnessPhone: witnessPhone || null,
     otherPartyName: otherPartyName || null,
     otherPartyPhone: otherPartyPhone || null,
     otherPartyRole: otherPartyRole || null,
     gateEntryRef: gateEntryRef || null,
-    productName: productName || null,
+    productName: String(productName).trim().toUpperCase(),
     batchNumber: batchNumber || null,
     entryDate: entryDate || new Date().toISOString().split("T")[0],
     remarks: remarks || null,
+    remarkHistory: [],
+    amountPerKg: amountPerKg ? Number(amountPerKg) : null,
+    productAmount: productAmount ? Number(productAmount) : null,
+    gstAmount: gstAmount ? Number(gstAmount) : null,
+    expenseAmount: expenseAmount ? Number(expenseAmount) : null,
+    expenseReason: expenseReason || null,
+    totalAmountWithGst: totalAmountWithGst ? Number(totalAmountWithGst) : null,
     createdBy: user.id || user.uid || "unknown",
     createdByName: user.name || user.email || "System",
     createdAt: new Date(),
@@ -299,15 +320,62 @@ exports.getStockEntryById = asyncHandler(async (req, res) => {
 });
 
 exports.updateStockEntry = asyncHandler(async (req, res) => {
+  if (!isManagerUser(req.user)) {
+    throw new ApiError(403, "Access denied. Managers only can edit entries.");
+  }
   const ref = db.collection("stockEntries").doc(req.params.id);
   const doc = await ref.get();
   if (!doc.exists) throw new ApiError(404, "Stock entry not found");
 
   const folder = `stockmanagement/stockentry/${doc.data().stockEntryId || req.params.id}`;
   const updates = { ...req.body, updatedAt: new Date() };
+  if (updates.productName) updates.productName = String(updates.productName).trim().toUpperCase();
+
+  // Validate quantities if provided
+  const existing = doc.data();
+  const billed = updates.totalBilledQty !== undefined ? Number(updates.totalBilledQty) : Number(existing.totalBilledQty);
+  const approved = updates.approvedQty !== undefined ? Number(updates.approvedQty) : Number(existing.approvedQty);
+  const rejected = updates.rejectedQty !== undefined ? Number(updates.rejectedQty) : Number(existing.rejectedQty || 0);
+
+  if (billed !== null && billed !== undefined && !isNaN(billed)) {
+    if (approved + rejected > billed) {
+      throw new ApiError(400, `Approved (${approved}) + Rejected (${rejected}) cannot exceed Total Billed Qty (${billed}).`);
+    }
+  }
 
   if (updates.rejectedItemPhoto && String(updates.rejectedItemPhoto).startsWith("data:")) updates.rejectedItemPhoto = await uploadBase64File(updates.rejectedItemPhoto, folder, "rejectedItemPhoto");
   if (updates.rejectedItemVideo && String(updates.rejectedItemVideo).startsWith("data:")) updates.rejectedItemVideo = await uploadBase64File(updates.rejectedItemVideo, folder, "rejectedItemVideo");
+
+  // Prevent reducing approvedQty if it causes negative stock, using Transaction
+  if (updates.approvedQty !== undefined) {
+    const newApproved = Number(updates.approvedQty);
+    const oldApproved = Number(existing.approvedQty || 0);
+    if (newApproved < oldApproved) {
+      const pName = updates.productName || existing.productName;
+      if (pName) {
+        const normalizedProductName = String(pName).trim().toUpperCase();
+        
+        await db.runTransaction(async (t) => {
+          const tEntriesSnap = await t.get(db.collection("stockEntries").where("productName", "==", normalizedProductName));
+          const tExitsSnap = await t.get(db.collection("stockExits").where("productName", "==", normalizedProductName));
+          
+          const totalReceived = tEntriesSnap.docs.reduce((s, d) => {
+            if (d.id === req.params.id) return s + newApproved;
+            return s + (Number(d.data().approvedQty) || 0);
+          }, 0);
+          const totalExited = tExitsSnap.docs.reduce((s, d) => s + (Number(d.data().qtyDispatched) || 0), 0);
+          
+          if (totalReceived < totalExited) {
+            const required = totalExited - (totalReceived - newApproved);
+            throw new ApiError(400, `Race condition prevented: Cannot reduce approved quantity to ${newApproved}. This product already has ${totalExited} kg dispatched. Minimum required is ${required} kg.`);
+          }
+          
+          t.update(ref, updates);
+        });
+        return res.json({ message: "Stock entry updated" });
+      }
+    }
+  }
 
   await ref.update(updates);
   res.json({ message: "Stock entry updated" });
@@ -345,6 +413,12 @@ exports.createStockExit = asyncHandler(async (req, res) => {
     itemVideo,
     exitPhoto,
     exitVideo,
+    amountPerKg,
+    productAmount,
+    gstAmount,
+    expenseAmount,
+    expenseReason,
+    totalAmountWithGst,
   } = req.body;
 
   if (!productName || !String(productName).trim()) {
@@ -357,6 +431,18 @@ exports.createStockExit = asyncHandler(async (req, res) => {
   const parsedValue = totalValue ? Number(totalValue) : null;
   if (isNaN(parsedQty) || parsedQty <= 0)                           throw new ApiError(400, "Quantity Dispatched must be a positive number.");
   if (parsedValue !== null && (isNaN(parsedValue) || parsedValue < 0)) throw new ApiError(400, "Total Value must be a positive number.");
+
+  // Validation: Prevent Negative Stock
+  const normalizedProductName = String(productName).trim().toUpperCase();
+  const entriesSnap = await db.collection("stockEntries").where("productName", "==", normalizedProductName).get();
+  const exitsSnap = await db.collection("stockExits").where("productName", "==", normalizedProductName).get();
+  const totalReceived = entriesSnap.docs.reduce((s, d) => s + (Number(d.data().approvedQty) || 0), 0);
+  const totalExited = exitsSnap.docs.reduce((s, d) => s + (Number(d.data().qtyDispatched) || 0), 0);
+  const availableQty = totalReceived - totalExited;
+  
+  if (parsedQty > availableQty) {
+    throw new ApiError(400, `Insufficient stock. Only ${availableQty} kg of "${productName}" is available.`);
+  }
 
   const stockExitId = await getNextId("stockExitCounter", "SX");
   const folder = `stockmanagement/stockexit/${stockExitId}`;
@@ -377,7 +463,7 @@ exports.createStockExit = asyncHandler(async (req, res) => {
 
   const data = {
     stockExitId,
-    productName: productName || null,
+    productName: productName ? String(productName).trim().toUpperCase() : null,
     batchNumber: batchNumber || null,
     packagingType: packagingType || null,
     totalValue: parsedValue,
@@ -401,6 +487,12 @@ exports.createStockExit = asyncHandler(async (req, res) => {
     gateEntryRef: gateEntryRef || null,
     exitDate: exitDate || new Date().toISOString().split("T")[0],
     remarks: remarks || null,
+    amountPerKg: amountPerKg ? Number(amountPerKg) : null,
+    productAmount: productAmount ? Number(productAmount) : null,
+    gstAmount: gstAmount ? Number(gstAmount) : null,
+    expenseAmount: expenseAmount ? Number(expenseAmount) : null,
+    expenseReason: expenseReason || null,
+    totalAmountWithGst: totalAmountWithGst ? Number(totalAmountWithGst) : null,
     vehiclePhoto: uploadedVehiclePhoto || null,
     itemPhoto: uploadedItemPhoto || null,
     itemVideo: uploadedItemVideo || null,
@@ -412,7 +504,21 @@ exports.createStockExit = asyncHandler(async (req, res) => {
     updatedAt: new Date(),
   };
 
-  await db.collection("stockExits").doc(stockExitId).set(data);
+  // Strict Validation & Write inside Transaction to prevent concurrency race conditions
+  await db.runTransaction(async (t) => {
+    const tEntriesSnap = await t.get(db.collection("stockEntries").where("productName", "==", normalizedProductName));
+    const tExitsSnap = await t.get(db.collection("stockExits").where("productName", "==", normalizedProductName));
+    
+    const tTotalReceived = tEntriesSnap.docs.reduce((s, d) => s + (Number(d.data().approvedQty) || 0), 0);
+    const tTotalExited = tExitsSnap.docs.reduce((s, d) => s + (Number(d.data().qtyDispatched) || 0), 0);
+    const tAvailableQty = tTotalReceived - tTotalExited;
+    
+    if (parsedQty > tAvailableQty) {
+      throw new ApiError(400, `Race condition prevented: Insufficient stock. Only ${tAvailableQty} kg of "${productName}" is available.`);
+    }
+
+    t.set(db.collection("stockExits").doc(stockExitId), data);
+  });
   res.status(201).json({ id: stockExitId, ...data });
 });
 
@@ -455,12 +561,16 @@ exports.getStockExitById = asyncHandler(async (req, res) => {
 });
 
 exports.updateStockExit = asyncHandler(async (req, res) => {
+  if (!isManagerUser(req.user)) {
+    throw new ApiError(403, "Access denied. Managers only can edit exits.");
+  }
   const ref = db.collection("stockExits").doc(req.params.id);
   const doc = await ref.get();
   if (!doc.exists) throw new ApiError(404, "Stock exit not found");
 
   const folder = `stockmanagement/stockexit/${doc.data().stockExitId || req.params.id}`;
   const updates = { ...req.body, updatedAt: new Date() };
+  if (updates.productName) updates.productName = String(updates.productName).trim().toUpperCase();
 
   if (updates.vehiclePhoto && String(updates.vehiclePhoto).startsWith("data:")) updates.vehiclePhoto = await uploadBase64File(updates.vehiclePhoto, folder, "vehiclePhoto");
   if (updates.itemPhoto && String(updates.itemPhoto).startsWith("data:")) updates.itemPhoto = await uploadBase64File(updates.itemPhoto, folder, "itemPhoto");
@@ -468,37 +578,65 @@ exports.updateStockExit = asyncHandler(async (req, res) => {
   if (updates.exitPhoto && String(updates.exitPhoto).startsWith("data:")) updates.exitPhoto = await uploadBase64File(updates.exitPhoto, folder, "exitPhoto");
   if (updates.exitVideo && String(updates.exitVideo).startsWith("data:")) updates.exitVideo = await uploadBase64File(updates.exitVideo, folder, "exitVideo");
 
-  await ref.update(updates);
+  // Strict Validation & Write inside Transaction to prevent Negative Stock on Update
+  if (updates.qtyDispatched) {
+    const newQty = Number(updates.qtyDispatched);
+    const productName = updates.productName || doc.data().productName;
+    const normalizedProductName = productName ? String(productName).trim().toUpperCase() : null;
+    
+    await db.runTransaction(async (t) => {
+      const tEntriesSnap = await t.get(db.collection("stockEntries").where("productName", "==", normalizedProductName));
+      const tExitsSnap = await t.get(db.collection("stockExits").where("productName", "==", normalizedProductName));
+      
+      const tTotalReceived = tEntriesSnap.docs.reduce((s, d) => s + (Number(d.data().approvedQty) || 0), 0);
+      const tTotalExited = tExitsSnap.docs.reduce((s, d) => {
+        if (d.id === req.params.id) return s; // skip current
+        return s + (Number(d.data().qtyDispatched) || 0);
+      }, 0);
+      
+      const tAvailableQty = tTotalReceived - tTotalExited;
+      if (newQty > tAvailableQty) {
+        throw new ApiError(400, `Race condition prevented: Insufficient stock. Only ${tAvailableQty} kg of "${productName}" is available.`);
+      }
+      
+      t.update(ref, updates);
+    });
+  } else {
+    await ref.update(updates);
+  }
+
   res.json({ message: "Stock exit updated" });
 });
 
 exports.getStockStats = asyncHandler(async (req, res) => {
-  const [geSnap, seSnap, sxSnap] = await Promise.all([
+  const [geCount, seCount, sxCount, seSum] = await Promise.all([
     db.collection("stockGateEntries").count().get(),
-    db.collection("stockEntries").select("approvedQty", "rejectedQty").get(),
+    db.collection("stockEntries").count().get(),
     db.collection("stockExits").count().get(),
+    db.collection("stockEntries").aggregate({
+      totalApproved: AggregateField.sum("approvedQty"),
+      totalRejected: AggregateField.sum("rejectedQty"),
+    }).get(),
   ]);
 
-  const stockEntries = seSnap.docs.map((d) => d.data());
-  const totalApproved = stockEntries.reduce(
-    (s, e) => s + (e.approvedQty || 0),
-    0
-  );
-  const totalRejected = stockEntries.reduce(
-    (s, e) => s + (e.rejectedQty || 0),
-    0
-  );
-
   res.json({
-    totalGateEntries: geSnap.data().count,
-    totalStockEntries: seSnap.size,
-    totalStockExits: sxSnap.data().count,
-    totalApprovedQty: totalApproved,
-    totalRejectedQty: totalRejected,
+    totalGateEntries: geCount.data().count,
+    totalStockEntries: seCount.data().count,
+    totalStockExits: sxCount.data().count,
+    totalApprovedQty: seSum.data().totalApproved || 0,
+    totalRejectedQty: seSum.data().totalRejected || 0,
   });
-  });
+});
 
-const bulkDeleteDocs = async (collectionName, ids) => {
+const deleteStorageFolder = async (folderPath) => {
+  try {
+    await bucket.deleteFiles({ prefix: folderPath });
+  } catch (err) {
+    console.error("Error deleting storage folder", folderPath, err);
+  }
+};
+
+const bulkDeleteDocs = async (collectionName, ids, idField, prefixFolder) => {
   if (!ids || !ids.length) return;
   const chunkSize = 400;
   for (let i = 0; i < ids.length; i += chunkSize) {
@@ -512,6 +650,10 @@ const bulkDeleteDocs = async (collectionName, ids) => {
     for (const snap of snaps) {
       if (snap.exists) {
         batch.delete(snap.ref);
+        const data = snap.data();
+        const customId = data[idField] || snap.id;
+        const folder = `stockmanagement/${prefixFolder}/${customId}`;
+        await deleteStorageFolder(folder);
       }
     }
     
@@ -525,7 +667,7 @@ exports.bulkDeleteGateEntries = asyncHandler(async (req, res) => {
   }
   const { ids } = req.body;
   if (!ids || !Array.isArray(ids)) throw new ApiError(400, "Invalid IDs array");
-  await bulkDeleteDocs("stockGateEntries", ids);
+  await bulkDeleteDocs("stockGateEntries", ids, "gateEntryId", "gateentry");
   res.json({ message: `${ids.length} gate entries deleted successfully` });
 });
 
@@ -535,7 +677,35 @@ exports.bulkDeleteStockEntries = asyncHandler(async (req, res) => {
   }
   const { ids } = req.body;
   if (!ids || !Array.isArray(ids)) throw new ApiError(400, "Invalid IDs array");
-  await bulkDeleteDocs("stockEntries", ids);
+
+  // Validate that deletion won't cause negative stock
+  const refs = ids.map(id => db.collection("stockEntries").doc(id));
+  const snaps = await db.getAll(...refs);
+  
+  const productReductions = {};
+  snaps.forEach(snap => {
+    if (snap.exists) {
+      const data = snap.data();
+      if (data.productName && data.approvedQty) {
+        const p = String(data.productName).trim().toUpperCase();
+        productReductions[p] = (productReductions[p] || 0) + Number(data.approvedQty);
+      }
+    }
+  });
+  
+  for (const [prod, reduction] of Object.entries(productReductions)) {
+    const [entSnap, exSnap] = await Promise.all([
+      db.collection("stockEntries").where("productName", "==", prod).get(),
+      db.collection("stockExits").where("productName", "==", prod).get(),
+    ]);
+    const totalReceived = entSnap.docs.reduce((s, d) => s + (Number(d.data().approvedQty) || 0), 0);
+    const totalExited = exSnap.docs.reduce((s, d) => s + (Number(d.data().qtyDispatched) || 0), 0);
+    if ((totalReceived - reduction) < totalExited) {
+      throw new ApiError(400, `Cannot delete these entries. Deleting them removes ${reduction} kg of "${prod}", but ${totalExited} kg is already dispatched (only ${totalReceived} kg total received).`);
+    }
+  }
+
+  await bulkDeleteDocs("stockEntries", ids, "stockEntryId", "stockentry");
   res.json({ message: `${ids.length} stock entries deleted successfully` });
 });
 
@@ -545,6 +715,72 @@ exports.bulkDeleteStockExits = asyncHandler(async (req, res) => {
   }
   const { ids } = req.body;
   if (!ids || !Array.isArray(ids)) throw new ApiError(400, "Invalid IDs array");
-  await bulkDeleteDocs("stockExits", ids);
+  await bulkDeleteDocs("stockExits", ids, "stockExitId", "stockexit");
   res.json({ message: `${ids.length} stock exits deleted successfully` });
+});
+
+exports.getStockSummary = asyncHandler(async (req, res) => {
+  // Fetch all entries and exits to calculate accurate stock summaries
+  const [entriesSnap, exitsSnap] = await Promise.all([
+    db.collection("stockEntries").get(),
+    db.collection("stockExits").get()
+  ]);
+
+  const summary = {};
+
+  entriesSnap.docs.forEach(doc => {
+    const data = doc.data();
+    if (!data.productName) return;
+    const prod = String(data.productName).trim().toUpperCase();
+    if (!summary[prod]) summary[prod] = { received: 0, exited: 0, purchaseValue: 0, purchaseExpense: 0, salesValue: 0, salesExpense: 0, entryCount: 0, exitCount: 0 };
+    summary[prod].received += (Number(data.approvedQty) || 0);
+    summary[prod].purchaseValue += (Number(data.totalAmountWithGst) || 0);
+    summary[prod].purchaseExpense += (Number(data.expenseAmount) || 0);
+    summary[prod].entryCount += 1;
+  });
+
+  exitsSnap.docs.forEach(doc => {
+    const data = doc.data();
+    if (!data.productName) return;
+    const prod = String(data.productName).trim().toUpperCase();
+    if (!summary[prod]) summary[prod] = { received: 0, exited: 0, purchaseValue: 0, purchaseExpense: 0, salesValue: 0, salesExpense: 0, entryCount: 0, exitCount: 0 };
+    summary[prod].exited += (Number(data.qtyDispatched) || 0);
+    summary[prod].salesValue += (Number(data.totalAmountWithGst) || 0);
+    summary[prod].salesExpense += (Number(data.expenseAmount) || 0);
+    summary[prod].exitCount += 1;
+  });
+
+  res.json({ summary });
+});
+
+exports.getUnreadRemarks = asyncHandler(async (req, res) => {
+  const [geSnap, seSnap, sxSnap] = await Promise.all([
+    db.collection("stockGateEntries").where("hasUnreadRemark", "==", true).get(),
+    db.collection("stockEntries").where("hasUnreadRemark", "==", true).get(),
+    db.collection("stockExits").where("hasUnreadRemark", "==", true).get(),
+  ]);
+
+  const mapData = (snap, type, idField) => snap.docs.map(d => {
+    const data = d.data();
+    return {
+      id: d.id,
+      type,
+      displayId: data[idField] || d.id,
+      productName: data.productName || "Unknown Product",
+      date: data.updatedAt || data.createdAt,
+      remarkHistory: data.remarkHistory
+    };
+  });
+
+  const unread = [
+    ...mapData(geSnap, "gate", "gateEntryId"),
+    ...mapData(seSnap, "entry", "stockEntryId"),
+    ...mapData(sxSnap, "exit", "stockExitId"),
+  ].sort((a, b) => {
+    const timeA = a.date && a.date.toDate ? a.date.toDate().getTime() : 0;
+    const timeB = b.date && b.date.toDate ? b.date.toDate().getTime() : 0;
+    return timeB - timeA;
+  });
+
+  res.json({ unread });
 });

@@ -11,7 +11,15 @@ const requireAdmin = (req, res, next) => {
   next();
 };
 
+const rateLimit = require("express-rate-limit");
+
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 5, // Limit each IP to 5 login requests per window
+  message: { message: "Too many login attempts from this IP, please try again after 15 minutes." }
+});
+
 router.post("/register", verifyToken, requireAdmin, registerUser);
-router.post("/login", loginUser);
+router.post("/login", loginLimiter, loginUser);
 
 module.exports = router;

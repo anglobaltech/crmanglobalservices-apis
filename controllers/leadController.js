@@ -74,7 +74,8 @@ exports.getLeads = async (req, res) => {
     if (assignedTo)      query = query.where("assignedTo", "==", assignedTo);
     if (leadType)        query = query.where("leadType", "==", leadType);
 
-    const snapshot = await query.get();
+    // Limit to 1000 to prevent Server OOM crashes and massive DB reads
+    const snapshot = await query.limit(1000).get();
     let leads = snapshot.docs.map((doc) => {
       const data = doc.data();
       return {
@@ -145,7 +146,7 @@ exports.createLead = async (req, res) => {
     if (!name || !phone) return res.status(400).json({ error: "Name and phone are required" });
 
     const normalizedPhone = normalizePhone(phone);
-    const dupSnap = await db.collection("leads").where("phone", "==", phone).limit(1).get();
+    const dupSnap = await db.collection("leads").where("normalizedPhone", "==", normalizedPhone).limit(1).get();
     if (!dupSnap.empty) return res.status(409).json({ error: "Lead already exists" });
 
     const lead = {
@@ -194,9 +195,9 @@ exports.importLeads = async (req, res) => {
     let currentBatchCount = 0;
 
     for (const l of leads) {
-      const rawPhone = l.mobile || l.phone;
-      const phone = normalizePhone(rawPhone);
-      if (!phone || existingPhones.has(phone) || seenInFile.has(phone)) {
+      const rawPhone = l.mobile || l.phone || "";
+      const normalizedPhoneValue = normalizePhone(rawPhone);
+      if (!normalizedPhoneValue || existingPhones.has(normalizedPhoneValue) || seenInFile.has(normalizedPhoneValue)) {
         results.duplicates++;
         continue;
       }
@@ -205,7 +206,8 @@ exports.importLeads = async (req, res) => {
       const ref = db.collection("leads").doc(leadId);
       batch.set(ref, {
         name:            l.name        || "Unknown",
-        phone,
+        phone:           rawPhone,
+        normalizedPhone: normalizedPhoneValue,
         email:           l.email       || "",
         companyName:     l.companyName || l.company || "",
         source:          l.source      || "excel",
@@ -219,8 +221,8 @@ exports.importLeads = async (req, res) => {
         createdAt: Timestamp.now(),
         updatedAt: Timestamp.now(),
       });
-      existingPhones.add(phone);
-      seenInFile.add(phone);
+      existingPhones.add(normalizedPhoneValue);
+      seenInFile.add(normalizedPhoneValue);
       results.imported++;
       currentBatchCount++;
 

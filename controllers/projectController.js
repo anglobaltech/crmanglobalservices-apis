@@ -444,8 +444,8 @@ exports.getProjects = asyncHandler(async (req, res) => {
 
 
 
-  // Fallback to in-memory processing for search or complex access rights
-  const snap = await baseQuery.get();
+  // Fallback to in-memory processing for search or complex access rights. Limit to 1000 to prevent OOM
+  const snap = await baseQuery.limit(1000).get();
   let projects = snap.docs.map((d) => serializeProject(d.id, d.data()));
 
   if (!isManager) {

@@ -5,9 +5,9 @@ const slugify = (text) => text.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace
 const MODULES = ["dashboard", "users", "sales", "allocate", "settings", "services", "projects", "stock", "documents"];
 
 const ROLES_CONFIG = [
-  { department: "management", name: "Super Admin" },
-  { department: "management", name: "Director" },
   { department: "management", name: "Founder & CEO" },
+  { department: "management", name: "Director" },
+  { department: "management", name: "Super Admin" },
   { department: "sales", name: "Branch Manager" },
   { department: "sales", name: "Manager" },
   { department: "sales", name: "Team Manager" },
@@ -18,6 +18,7 @@ const ROLES_CONFIG = [
   { department: "services", name: "Senior Executive" },
   { department: "services", name: "Executive" },
   { department: "services", name: "Support Staff" },
+  { department: "services", name: "Stock Viewer" },
   { department: "services", name: "Intern" },
   { department: "accounts", name: "Account Manager" },
   { department: "accounts", name: "Accountant" },
@@ -25,8 +26,8 @@ const ROLES_CONFIG = [
   { department: "software", name: "Senior Software Engineer" },
   { department: "software", name: "Software Engineer" },
   { department: "software", name: "Web Developer" },
-  { department: "software", name: "Web Developer Intern" },
   { department: "software", name: "Data Analyst" },
+  { department: "software", name: "Web Developer Intern" },
   { department: "software", name: "Data Analyst Intern" },
   { department: "software", name: "Intern" },
 ];
@@ -43,6 +44,7 @@ const DEFAULT_PERMISSIONS = {
   "Intern":                   { dashboard: true,  users: false, sales: false, leads: false, allocate: false, settings: false, services: false, projects: false, stock: false, documents: false },
   "Service Manager":          { dashboard: true,  users: false, sales: false, leads: false, allocate: true,  settings: false, services: true,  projects: true,  stock: true,  documents: true  },
   "Senior Executive":         { dashboard: true,  users: false, sales: false, leads: false, allocate: false, settings: false, services: true,  projects: true,  stock: true,  documents: true  },
+  "Stock Viewer":             { dashboard: true,  users: false, sales: false, leads: false, allocate: false, settings: false, services: false, projects: false, stock: true,  documents: false },
   "Support Staff":            { dashboard: true,  users: false, sales: false, leads: false, allocate: false, settings: false, services: true,  projects: true,  stock: true,  documents: false },
   "Account Manager":          { dashboard: true,  users: false, sales: false, leads: false, allocate: false, settings: false, services: false, projects: false, stock: false, documents: true  },
   "Accountant":               { dashboard: true,  users: false, sales: false, leads: false, allocate: false, settings: false, services: false, projects: false, stock: false, documents: true  },

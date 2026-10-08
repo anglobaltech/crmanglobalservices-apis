@@ -18,9 +18,13 @@ const {
   bulkDeleteGateEntries,
   bulkDeleteStockEntries,
   bulkDeleteStockExits,
+  getUnreadRemarks,
+  getStockSummary,
 } = require("../controllers/stockController");
 
+router.get("/summary", verifyToken, getStockSummary);
 router.get("/stats", verifyToken, getStockStats);
+router.get("/unread-remarks", verifyToken, getUnreadRemarks);
 
 router.post("/gate-entries/bulk-delete", verifyToken, bulkDeleteGateEntries);
 router.get("/gate-entries", verifyToken, getGateEntries);
