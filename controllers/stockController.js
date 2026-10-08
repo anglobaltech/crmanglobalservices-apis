@@ -213,6 +213,9 @@ exports.createStockEntry = asyncHandler(async (req, res) => {
     expenseAmount,
     expenseReason,
     totalAmountWithGst,
+    tdsApplicable,
+    tdsAmount,
+    productAmountAfterTds,
   } = req.body;
 
   if (!productName || !String(productName).trim()) {
@@ -270,6 +273,9 @@ exports.createStockEntry = asyncHandler(async (req, res) => {
     expenseAmount: expenseAmount ? Number(expenseAmount) : null,
     expenseReason: expenseReason || null,
     totalAmountWithGst: totalAmountWithGst ? Number(totalAmountWithGst) : null,
+    tdsApplicable: tdsApplicable || false,
+    tdsAmount: tdsAmount ? Number(tdsAmount) : null,
+    productAmountAfterTds: productAmountAfterTds ? Number(productAmountAfterTds) : null,
     createdBy: user.id || user.uid || "unknown",
     createdByName: user.name || user.email || "System",
     createdAt: new Date(),
@@ -419,6 +425,9 @@ exports.createStockExit = asyncHandler(async (req, res) => {
     expenseAmount,
     expenseReason,
     totalAmountWithGst,
+    tdsApplicable,
+    tdsAmount,
+    productAmountAfterTds,
   } = req.body;
 
   if (!productName || !String(productName).trim()) {
@@ -493,6 +502,9 @@ exports.createStockExit = asyncHandler(async (req, res) => {
     expenseAmount: expenseAmount ? Number(expenseAmount) : null,
     expenseReason: expenseReason || null,
     totalAmountWithGst: totalAmountWithGst ? Number(totalAmountWithGst) : null,
+    tdsApplicable: tdsApplicable || false,
+    tdsAmount: tdsAmount ? Number(tdsAmount) : null,
+    productAmountAfterTds: productAmountAfterTds ? Number(productAmountAfterTds) : null,
     vehiclePhoto: uploadedVehiclePhoto || null,
     itemPhoto: uploadedItemPhoto || null,
     itemVideo: uploadedItemVideo || null,
