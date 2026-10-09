@@ -5,10 +5,16 @@ const { registerUser, loginUser } = require("../controllers/authController");
 const verifyToken = require("../middleware/authMiddleware");
 
 const requireAdmin = (req, res, next) => {
-  if (!req.user || (req.user.roleName !== "admin" && req.user.roleName !== "Super Admin")) {
+  if (!req.user) {
     return res.status(403).json({ message: "Admin access required" });
   }
-  next();
+  const role = (req.user.roleName || "").toLowerCase();
+  const dept = (req.user.department || "").toLowerCase();
+  
+  if (role === "admin" || role === "super admin" || role === "manager" || dept === "management") {
+    return next();
+  }
+  return res.status(403).json({ message: "Admin or Manager access required" });
 };
 
 const rateLimit = require("express-rate-limit");

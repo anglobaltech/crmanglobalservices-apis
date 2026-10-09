@@ -85,8 +85,14 @@ router.put("/:id", verifyToken, async (req, res) => {
 
 router.patch("/:id/status", verifyToken, async (req, res) => {
   try {
-    if (!req.user || (req.user.roleName !== "admin" && req.user.roleName !== "Super Admin")) {
+    if (!req.user) {
       return res.status(403).json({ message: "Admin access required to change status" });
+    }
+    const role = (req.user.roleName || "").toLowerCase();
+    const dept = (req.user.department || "").toLowerCase();
+    
+    if (!(role === "admin" || role === "super admin" || role === "manager" || dept === "management")) {
+      return res.status(403).json({ message: "Admin or Manager access required to change status" });
     }
 
     const userRef = db.collection("users").doc(req.params.id);

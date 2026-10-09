@@ -247,6 +247,7 @@ exports.createStockEntry = asyncHandler(async (req, res) => {
 
   const data = {
     stockEntryId,
+    currency: req.body.currency || "INR",
     invoiceNumber: invoiceNumber || null,
     billFrom: billFrom || null,
     billTo: billTo || null,
@@ -276,6 +277,7 @@ exports.createStockEntry = asyncHandler(async (req, res) => {
     tdsApplicable: tdsApplicable || false,
     tdsAmount: tdsAmount ? Number(tdsAmount) : null,
     productAmountAfterTds: productAmountAfterTds ? Number(productAmountAfterTds) : null,
+    exchangeRate: req.body.exchangeRate ? Number(req.body.exchangeRate) : null,
     createdBy: user.id || user.uid || "unknown",
     createdByName: user.name || user.email || "System",
     createdAt: new Date(),
@@ -428,6 +430,7 @@ exports.createStockExit = asyncHandler(async (req, res) => {
     tdsApplicable,
     tdsAmount,
     productAmountAfterTds,
+    exchangeRate,
   } = req.body;
 
   if (!productName || !String(productName).trim()) {
@@ -472,6 +475,8 @@ exports.createStockExit = asyncHandler(async (req, res) => {
 
   const data = {
     stockExitId,
+    currency: req.body.currency || "INR",
+    exchangeRate: req.body.exchangeRate ? Number(req.body.exchangeRate) : null,
     productName: productName ? String(productName).trim().toUpperCase() : null,
     batchNumber: batchNumber || null,
     packagingType: packagingType || null,
@@ -744,9 +749,11 @@ exports.getStockSummary = asyncHandler(async (req, res) => {
     const data = doc.data();
     if (!data.productName) return;
     const prod = String(data.productName).trim().toUpperCase();
-    if (!summary[prod]) summary[prod] = { received: 0, exited: 0, purchaseValue: 0, purchaseExpense: 0, salesValue: 0, salesExpense: 0, entryCount: 0, exitCount: 0 };
+    if (!summary[prod]) summary[prod] = { received: 0, exited: 0, purchaseValue: 0, purchaseValueInr: 0, purchaseExpense: 0, salesValue: 0, salesValueInr: 0, salesExpense: 0, entryCount: 0, exitCount: 0 };
     summary[prod].received += (Number(data.approvedQty) || 0);
     summary[prod].purchaseValue += (Number(data.totalAmountWithGst) || 0);
+    const rate = Number(data.exchangeRate) || (data.currency === 'USD' ? 0 : 1);
+    summary[prod].purchaseValueInr += ((Number(data.totalAmountWithGst) || 0) * rate);
     summary[prod].purchaseExpense += (Number(data.expenseAmount) || 0);
     summary[prod].entryCount += 1;
   });
@@ -755,11 +762,26 @@ exports.getStockSummary = asyncHandler(async (req, res) => {
     const data = doc.data();
     if (!data.productName) return;
     const prod = String(data.productName).trim().toUpperCase();
-    if (!summary[prod]) summary[prod] = { received: 0, exited: 0, purchaseValue: 0, purchaseExpense: 0, salesValue: 0, salesExpense: 0, entryCount: 0, exitCount: 0 };
+    if (!summary[prod]) summary[prod] = { received: 0, exited: 0, purchaseValue: 0, purchaseValueInr: 0, purchaseExpense: 0, salesValue: 0, salesValueInr: 0, salesExpense: 0, entryCount: 0, exitCount: 0 };
     summary[prod].exited += (Number(data.qtyDispatched) || 0);
     summary[prod].salesValue += (Number(data.totalAmountWithGst) || 0);
+    const rate = Number(data.exchangeRate) || (data.currency === 'USD' ? 0 : 1);
+    summary[prod].salesValueInr += ((Number(data.totalAmountWithGst) || 0) * rate);
     summary[prod].salesExpense += (Number(data.expenseAmount) || 0);
     summary[prod].exitCount += 1;
+  });
+
+  // Fix floating point precision issues (e.g. 0.1 + 0.2 = 0.30000000000000004)
+  Object.keys(summary).forEach(prod => {
+    const s = summary[prod];
+    s.received = Math.round(s.received * 100) / 100;
+    s.exited = Math.round(s.exited * 100) / 100;
+    s.purchaseValue = Math.round(s.purchaseValue * 100) / 100;
+    s.purchaseValueInr = Math.round((s.purchaseValueInr || 0) * 100) / 100;
+    s.purchaseExpense = Math.round(s.purchaseExpense * 100) / 100;
+    s.salesValue = Math.round(s.salesValue * 100) / 100;
+    s.salesValueInr = Math.round((s.salesValueInr || 0) * 100) / 100;
+    s.salesExpense = Math.round(s.salesExpense * 100) / 100;
   });
 
   res.json({ summary });

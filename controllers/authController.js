@@ -22,10 +22,12 @@ exports.registerUser = async (req, res) => {
     return res.status(400).json({ message: "All fields are required" });
   if (!roleName) return res.status(400).json({ message: "Role is required" });
 
+  const emailLower = email.toLowerCase();
+
   try {
     const existing = await db
       .collection("users")
-      .where("email", "==", email)
+      .where("email", "==", emailLower)
       .get();
     if (!existing.empty)
       return res.status(400).json({ message: "User already exists" });
@@ -46,7 +48,7 @@ exports.registerUser = async (req, res) => {
     await db.collection("users").doc(userId).set({
       id: userId,
       name,
-      email,
+      email: emailLower,
       password: hashedPassword,
       roleId: roleId || roleName,
       roleName,
@@ -60,7 +62,7 @@ exports.registerUser = async (req, res) => {
       message: "User created successfully",
       id: userId,
       name,
-      email,
+      email: emailLower,
       roleName,
       department,
     });
@@ -75,7 +77,7 @@ exports.loginUser = async (req, res) => {
     return res.status(400).json({ message: "Email and password required" });
 
   try {
-    const snap = await db.collection("users").where("email", "==", email).get();
+    const snap = await db.collection("users").where("email", "==", email.toLowerCase()).get();
     if (snap.empty)
       return res.status(401).json({ message: "Invalid credentials" });
 
