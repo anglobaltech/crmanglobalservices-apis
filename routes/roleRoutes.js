@@ -13,7 +13,15 @@ const {
 } = require("../controllers/roleController");
 
 const requireAdmin = (req, res, next) => {
-  if (!req.user || (req.user.roleName !== "admin" && req.user.roleName !== "Super Admin")) {
+  if (!req.user) {
+    return res.status(403).json({ message: "Admin access required" });
+  }
+  const role = (req.user.roleName || "").toLowerCase();
+  const dept = (req.user.department || "").toLowerCase();
+  
+  const isAuthorized = role === "super admin" || role === "admin" || role === "director" || role === "founder & ceo" || role.includes("manager") || dept === "management";
+  
+  if (!isAuthorized) {
     return res.status(403).json({ message: "Admin access required" });
   }
   next();

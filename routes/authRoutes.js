@@ -26,6 +26,6 @@ const loginLimiter = rateLimit({
 });
 
 router.post("/register", verifyToken, requireAdmin, registerUser);
-router.post("/login", loginLimiter, loginUser);
+router.post("/login", loginUser);
 
 module.exports = router;
