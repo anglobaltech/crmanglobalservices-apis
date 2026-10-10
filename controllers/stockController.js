@@ -354,35 +354,42 @@ exports.updateStockEntry = asyncHandler(async (req, res) => {
   if (updates.rejectedItemPhoto && String(updates.rejectedItemPhoto).startsWith("data:")) updates.rejectedItemPhoto = await uploadBase64File(updates.rejectedItemPhoto, folder, "rejectedItemPhoto");
   if (updates.rejectedItemVideo && String(updates.rejectedItemVideo).startsWith("data:")) updates.rejectedItemVideo = await uploadBase64File(updates.rejectedItemVideo, folder, "rejectedItemVideo");
 
-  // Prevent reducing approvedQty if it causes negative stock, using Transaction
-  if (updates.approvedQty !== undefined) {
-    const newApproved = Number(updates.approvedQty);
-    const oldApproved = Number(existing.approvedQty || 0);
-    if (newApproved < oldApproved) {
-      const pName = updates.productName || existing.productName;
-      if (pName) {
-        const normalizedProductName = String(pName).trim().toUpperCase();
-        
-        await db.runTransaction(async (t) => {
-          const tEntriesSnap = await t.get(db.collection("stockEntries").where("productName", "==", normalizedProductName));
-          const tExitsSnap = await t.get(db.collection("stockExits").where("productName", "==", normalizedProductName));
-          
-          const totalReceived = tEntriesSnap.docs.reduce((s, d) => {
-            if (d.id === req.params.id) return s + newApproved;
-            return s + (Number(d.data().approvedQty) || 0);
-          }, 0);
-          const totalExited = tExitsSnap.docs.reduce((s, d) => s + (Number(d.data().qtyDispatched) || 0), 0);
-          
-          if (totalReceived < totalExited) {
-            const required = totalExited - (totalReceived - newApproved);
-            throw new ApiError(400, `Race condition prevented: Cannot reduce approved quantity to ${newApproved}. This product already has ${totalExited} kg dispatched. Minimum required is ${required} kg.`);
-          }
-          
-          t.update(ref, updates);
-        });
-        return res.json({ message: "Stock entry updated" });
+  // Prevent reducing approvedQty or changing productName if it causes negative stock for the OLD product
+  const oldProductName = String(existing.productName || "").trim().toUpperCase();
+  const newProductName = updates.productName || oldProductName;
+
+  const oldApproved = Number(existing.approvedQty || 0);
+  const newApproved = updates.approvedQty !== undefined ? Number(updates.approvedQty) : oldApproved;
+
+  const isProductChanged = oldProductName !== newProductName;
+  const isQtyDecreased = newApproved < oldApproved;
+
+  if ((isProductChanged || isQtyDecreased) && oldProductName) {
+    await db.runTransaction(async (t) => {
+      const tEntriesSnap = await t.get(db.collection("stockEntries").where("productName", "==", oldProductName));
+      const tExitsSnap = await t.get(db.collection("stockExits").where("productName", "==", oldProductName));
+      
+      const totalReceived = tEntriesSnap.docs.reduce((s, d) => {
+        if (d.id === req.params.id) {
+          return isProductChanged ? s : s + newApproved;
+        }
+        return s + (Number(d.data().approvedQty) || 0);
+      }, 0);
+      
+      const totalExited = tExitsSnap.docs.reduce((s, d) => s + (Number(d.data().qtyDispatched) || 0), 0);
+      
+      if (totalReceived < totalExited) {
+        if (isProductChanged) {
+          throw new ApiError(400, `Cannot change product name. The old product "${existing.productName}" has ${totalExited} kg dispatched, but without this entry it would only have ${totalReceived} kg received.`);
+        } else {
+          const required = totalExited - (totalReceived - newApproved);
+          throw new ApiError(400, `Race condition prevented: Cannot reduce approved quantity to ${newApproved}. Product "${existing.productName}" already has ${totalExited} kg dispatched.`);
+        }
       }
-    }
+      
+      t.update(ref, updates);
+    });
+    return res.json({ message: "Stock entry updated" });
   }
 
   await ref.update(updates);
@@ -771,17 +778,17 @@ exports.getStockSummary = asyncHandler(async (req, res) => {
     summary[prod].exitCount += 1;
   });
 
-  // Fix floating point precision issues (e.g. 0.1 + 0.2 = 0.30000000000000004)
+  // Fix floating point precision issues (e.g. 0.1 + 0.2 = 0.30000000000000004) and round monetary values to integers
   Object.keys(summary).forEach(prod => {
     const s = summary[prod];
     s.received = Math.round(s.received * 100) / 100;
     s.exited = Math.round(s.exited * 100) / 100;
-    s.purchaseValue = Math.round(s.purchaseValue * 100) / 100;
-    s.purchaseValueInr = Math.round((s.purchaseValueInr || 0) * 100) / 100;
-    s.purchaseExpense = Math.round(s.purchaseExpense * 100) / 100;
-    s.salesValue = Math.round(s.salesValue * 100) / 100;
-    s.salesValueInr = Math.round((s.salesValueInr || 0) * 100) / 100;
-    s.salesExpense = Math.round(s.salesExpense * 100) / 100;
+    s.purchaseValue = Math.round(s.purchaseValue);
+    s.purchaseValueInr = Math.round(s.purchaseValueInr || 0);
+    s.purchaseExpense = Math.round(s.purchaseExpense);
+    s.salesValue = Math.round(s.salesValue);
+    s.salesValueInr = Math.round(s.salesValueInr || 0);
+    s.salesExpense = Math.round(s.salesExpense);
   });
 
   res.json({ summary });
