@@ -113,7 +113,7 @@ exports.createGateEntry = asyncHandler(async (req, res) => {
     gateOpeningVideo: uploadedGateVideo || null,
     productVideo: uploadedProductVideo || null,
     productPhoto: uploadedProductPhoto || null,
-    warehouseLocation: warehouseLocation || null,
+    warehouseLocation: warehouseLocation || req.body.warehouseAddress || null,
     remarks: remarks || null,
     entryDate: entryDate || new Date().toISOString().split("T")[0],
     status: "open",
@@ -175,6 +175,10 @@ exports.updateGateEntry = asyncHandler(async (req, res) => {
 
   const folder = `stockmanagement/gateentry/${doc.data().gateEntryId || req.params.id}`;
   const updates = { ...req.body, updatedAt: new Date() };
+  if (req.body.warehouseAddress && !updates.warehouseLocation) {
+    updates.warehouseLocation = req.body.warehouseAddress;
+  }
+  if (updates.quantityKg != null) updates.quantityKg = Number(updates.quantityKg);
   if (updates.productName) updates.productName = String(updates.productName).trim().toUpperCase();
 
   if (updates.coaFile && String(updates.coaFile).startsWith("data:")) updates.coaFile = await uploadBase64File(updates.coaFile, folder, "coaFile");
