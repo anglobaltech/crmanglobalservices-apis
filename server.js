@@ -26,6 +26,7 @@ const salesRoutes = require("./routes/salesRoutes");
 const activityRoutes = require("./routes/activityRoutes");
 const serviceRoutes = require("./routes/serviceRoutes");
 const projectRoutes = require("./routes/projectRoutes");
+
 const stockRoutes = require("./routes/stockRoutes");
 const employeeRoutes = require("./routes/employeeRoutes");
 

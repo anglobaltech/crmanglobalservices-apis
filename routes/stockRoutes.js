@@ -20,8 +20,10 @@ const {
   bulkDeleteStockExits,
   getUnreadRemarks,
   getStockSummary,
+  getNextStockId,
 } = require("../controllers/stockController");
 
+router.get("/next-id", verifyToken, getNextStockId);
 router.get("/summary", verifyToken, getStockSummary);
 router.get("/stats", verifyToken, getStockStats);
 router.get("/unread-remarks", verifyToken, getUnreadRemarks);

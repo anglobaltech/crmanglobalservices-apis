@@ -20,6 +20,20 @@ async function getNextId(counterDoc, prefix) {
   });
 }
 
+exports.getNextStockId = asyncHandler(async (req, res) => {
+  const { type } = req.query; // 'gate', 'entry', 'exit'
+  const map = {
+    gate: { doc: "gateEntryCounter", prefix: "GE" },
+    entry: { doc: "stockEntryCounter", prefix: "SE" },
+    exit: { doc: "stockExitCounter", prefix: "SX" },
+  };
+  if (!map[type]) {
+    throw new ApiError(400, "Invalid stock type. Must be 'gate', 'entry', or 'exit'");
+  }
+  const id = await getNextId(map[type].doc, map[type].prefix);
+  res.json({ id });
+});
+
 exports.createGateEntry = asyncHandler(async (req, res) => {
   const user = req.user;
   const {
@@ -61,7 +75,7 @@ exports.createGateEntry = asyncHandler(async (req, res) => {
     warehouseLocation,
   } = req.body;
 
-  const gateEntryId = await getNextId("gateEntryCounter", "GE");
+  const gateEntryId = req.body.gateEntryId || (await getNextId("gateEntryCounter", "GE"));
   const folder = `stockmanagement/gateentry/${gateEntryId}`;
 
   const [
@@ -244,7 +258,7 @@ exports.createStockEntry = asyncHandler(async (req, res) => {
     }
   }
 
-  const stockEntryId = await getNextId("stockEntryCounter", "SE");
+  const stockEntryId = req.body.stockEntryId || (await getNextId("stockEntryCounter", "SE"));
   const folder = `stockmanagement/stockentry/${stockEntryId}`;
 
   const [uploadedRejectedPhoto, uploadedRejectedVideo] = await Promise.all([
@@ -472,7 +486,7 @@ exports.createStockExit = asyncHandler(async (req, res) => {
     throw new ApiError(400, `Insufficient stock. Only ${availableQty} kg of "${productName}" is available.`);
   }
 
-  const stockExitId = await getNextId("stockExitCounter", "SX");
+  const stockExitId = req.body.stockExitId || (await getNextId("stockExitCounter", "SX"));
   const folder = `stockmanagement/stockexit/${stockExitId}`;
 
   const [
