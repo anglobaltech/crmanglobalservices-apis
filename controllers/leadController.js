@@ -147,11 +147,12 @@ exports.createLead = async (req, res) => {
 
     const normalizedPhone = normalizePhone(phone);
     const dupSnap = await db.collection("leads").where("normalizedPhone", "==", normalizedPhone).limit(1).get();
-    if (!dupSnap.empty) return res.status(409).json({ error: "Lead already exists" });
+    if (!dupSnap.empty) return res.status(409).json({ error: "Lead already exists with this phone number" });
 
     const lead = {
       name,
       phone,
+      normalizedPhone,
       email:           email        || "",
       companyName:     companyName  || "",
       source:          source       || "manual",
@@ -250,8 +251,11 @@ exports.updateLead = async (req, res) => {
     const allowed = ["name", "phone", "email", "companyName", "source", "city", "state", "productInterest", "notes"];
     const updates = {};
     allowed.forEach((k) => { if (req.body[k] !== undefined) updates[k] = req.body[k]; });
+    if (updates.phone) updates.normalizedPhone = normalizePhone(updates.phone);
     updates.updatedAt = Timestamp.now();
     await db.collection("leads").doc(id).update(updates);
+    clearCachePrefix("myLeads");
+    clearCachePrefix("teamLeads");
     res.json({ id, ...updates });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -289,18 +293,25 @@ exports.bulkAssign = async (req, res) => {
       return res.status(403).json({ error: "Access denied. Managers only." });
     }
     const { leadIds, assignedTo, assignedToName } = req.body;
-    if (!leadIds?.length || !assignedTo)
+    if (!leadIds || !Array.isArray(leadIds) || leadIds.length === 0 || !assignedTo)
       return res.status(400).json({ error: "leadIds and assignedTo are required" });
-    const batch = db.batch();
-    leadIds.forEach((id) => {
-      batch.update(db.collection("leads").doc(id), {
-        assignedTo, assignedToName,
-        status: "allocated",
-        assignedAt: Timestamp.now(),
-        updatedAt:  Timestamp.now(),
+
+    // Chunk in batches of 400 to respect Firestore 500-op limit
+    const chunkSize = 400;
+    for (let i = 0; i < leadIds.length; i += chunkSize) {
+      const chunk = leadIds.slice(i, i + chunkSize);
+      const batch = db.batch();
+      chunk.forEach((id) => {
+        batch.update(db.collection("leads").doc(id), {
+          assignedTo, assignedToName,
+          status: "allocated",
+          assignedAt: Timestamp.now(),
+          updatedAt:  Timestamp.now(),
+        });
       });
-    });
-    await batch.commit();
+      await batch.commit();
+    }
+
     // Clear sales cache so the assigned user sees these leads immediately
     clearCachePrefix(`myLeads_${assignedTo}`);
     clearCachePrefix("teamLeads");
@@ -317,6 +328,8 @@ exports.deleteLead = async (req, res) => {
       return res.status(403).json({ error: "Access denied. Managers only." });
     }
     await db.collection("leads").doc(req.params.id).delete();
+    clearCachePrefix("myLeads");
+    clearCachePrefix("teamLeads");
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -324,14 +337,30 @@ exports.deleteLead = async (req, res) => {
 };
 
 exports.bulkDelete = async (req, res) => {
-  if (!isManagerUser(req.user)) {
-    return res.status(403).json({ error: "Access denied. Managers only." });
+  try {
+    if (!isManagerUser(req.user)) {
+      return res.status(403).json({ error: "Access denied. Managers only." });
+    }
+    const { leadIds } = req.body;
+    if (!leadIds || !Array.isArray(leadIds) || leadIds.length === 0) {
+      return res.status(400).json({ error: "leadIds array is required" });
+    }
+
+    // Chunk in batches of 400 to respect Firestore 500-op limit
+    const chunkSize = 400;
+    for (let i = 0; i < leadIds.length; i += chunkSize) {
+      const chunk = leadIds.slice(i, i + chunkSize);
+      const batch = db.batch();
+      chunk.forEach((id) => batch.delete(db.collection("leads").doc(id)));
+      await batch.commit();
+    }
+
+    clearCachePrefix("myLeads");
+    clearCachePrefix("teamLeads");
+    res.json({ success: true, count: leadIds.length });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
-  const { leadIds } = req.body;
-  const batch = db.batch();
-  leadIds.forEach((id) => batch.delete(db.collection("leads").doc(id)));
-  await batch.commit();
-  res.json({ success: true, count: leadIds.length });
 };
 
 exports.importExternalLeads = async () => {
@@ -353,6 +382,11 @@ exports.importExternalLeads = async () => {
       const existing = await db.collection("leads").where("sourceId", "==", externalIdStr).limit(1).get();
       if (!existing.empty) continue;
 
+      if (phone) {
+        const dupPhone = await db.collection("leads").where("normalizedPhone", "==", phone).limit(1).get();
+        if (!dupPhone.empty) continue;
+      }
+
       const leadId = await getNextLeadId();
       const fullMessage = l.message || "";
       const cleanNotes = fullMessage.split("Sender Details")[0].replace(/Buyer is looking for\s*/i, "").trim();
@@ -365,7 +399,8 @@ exports.importExternalLeads = async () => {
       await db.collection("leads").doc(leadId).set({
         leadId,
         name:            l.sender_name || "Unknown",
-        phone:           phone         || "",
+        phone:           rawPhone || phone,
+        normalizedPhone: phone,
         email:           email         || "",
         companyName:     companyName,
         source:          "tradeindia",

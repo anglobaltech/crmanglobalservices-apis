@@ -440,13 +440,13 @@ exports.getProjects = asyncHandler(async (req, res) => {
   const start = (parseInt(page) - 1) * parseInt(pageSize);
   const lim = parseInt(pageSize);
 
-  let baseQuery = db.collection("projects").where("isDeleted", "!=", true);
-
-
+  let baseQuery = db.collection("projects");
 
   // Fallback to in-memory processing for search or complex access rights. Limit to 1000 to prevent OOM
   const snap = await baseQuery.limit(1000).get();
-  let projects = snap.docs.map((d) => serializeProject(d.id, d.data()));
+  let projects = snap.docs
+    .map((d) => serializeProject(d.id, d.data()))
+    .filter((p) => p.isDeleted !== true);
 
   if (!isManager) {
     projects = projects.filter((p) => canAccessProject(req.user, p));
@@ -479,8 +479,8 @@ exports.getProjects = asyncHandler(async (req, res) => {
 
 exports.getProjectStats = asyncHandler(async (req, res) => {
   const isManager = isManagerUser(req.user);
-  const snap = await db.collection("projects").where("isDeleted", "!=", true).get();
-  let projects = snap.docs.map((d) => d.data());
+  const snap = await db.collection("projects").limit(1000).get();
+  let projects = snap.docs.map((d) => d.data()).filter((p) => p.isDeleted !== true);
 
   if (!isManager) {
     projects = projects.filter((p) => canAccessProject(req.user, p));

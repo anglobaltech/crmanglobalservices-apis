@@ -28,12 +28,25 @@ router.get("/:id", verifyToken, async (req, res) => {
   }
 });
 
+const isUserAdmin = (user) => {
+  if (!user) return false;
+  const role = (user.roleName || "").toLowerCase();
+  const dept = (user.department || "").toLowerCase();
+  return (
+    role === "super admin" ||
+    role === "admin" ||
+    role === "founder & ceo" ||
+    role === "director" ||
+    dept === "management"
+  );
+};
+
 router.put("/:id", verifyToken, async (req, res) => {
   const { name, email, password, department, roleName, roleId, profilePic } = req.body;
 
   try {
     const isSelf = req.user && (req.user.id === req.params.id || req.user.uid === req.params.id);
-    const isAdmin = req.user && (req.user.roleName === "admin" || req.user.roleName === "Super Admin");
+    const isAdmin = isUserAdmin(req.user);
 
     if (!isSelf && !isAdmin) {
       return res.status(403).json({ message: "Not authorized to update this user" });
@@ -91,7 +104,7 @@ router.patch("/:id/status", verifyToken, async (req, res) => {
     const role = (req.user.roleName || "").toLowerCase();
     const dept = (req.user.department || "").toLowerCase();
     
-    if (!(role === "admin" || role === "super admin" || role === "manager" || dept === "management")) {
+    if (!isUserAdmin(req.user) && !role.includes("manager")) {
       return res.status(403).json({ message: "Admin or Manager access required to change status" });
     }
 
@@ -109,7 +122,7 @@ router.patch("/:id/status", verifyToken, async (req, res) => {
 
 router.delete("/:id", verifyToken, async (req, res) => {
   try {
-    if (!req.user || (req.user.roleName !== "admin" && req.user.roleName !== "Super Admin")) {
+    if (!isUserAdmin(req.user)) {
       return res.status(403).json({ message: "Admin access required to delete user" });
     }
 

@@ -3,6 +3,7 @@ const { AggregateField } = require("firebase-admin/firestore");
 const asyncHandler = require("../utils/asyncHandler");
 const ApiError = require("../utils/ApiError");
 const { uploadBase64File } = require("../utils/storageHelper");
+const { getCache, setCache, clearCachePrefix } = require("../utils/cache");
 
 const isManagerUser = (user) => {
   if (!user) return false;
@@ -307,6 +308,7 @@ exports.createStockEntry = asyncHandler(async (req, res) => {
   };
 
   await db.collection("stockEntries").doc(stockEntryId).set(data);
+  clearCachePrefix("stock_summary");
   res.status(201).json({ id: stockEntryId, ...data });
 });
 
@@ -411,10 +413,12 @@ exports.updateStockEntry = asyncHandler(async (req, res) => {
       
       t.update(ref, updates);
     });
+    clearCachePrefix("stock_summary");
     return res.json({ message: "Stock entry updated" });
   }
 
   await ref.update(updates);
+  clearCachePrefix("stock_summary");
   res.json({ message: "Stock entry updated" });
 });
 
@@ -474,17 +478,7 @@ exports.createStockExit = asyncHandler(async (req, res) => {
   if (isNaN(parsedQty) || parsedQty <= 0)                           throw new ApiError(400, "Quantity Dispatched must be a positive number.");
   if (parsedValue !== null && (isNaN(parsedValue) || parsedValue < 0)) throw new ApiError(400, "Total Value must be a positive number.");
 
-  // Validation: Prevent Negative Stock
   const normalizedProductName = String(productName).trim().toUpperCase();
-  const entriesSnap = await db.collection("stockEntries").where("productName", "==", normalizedProductName).get();
-  const exitsSnap = await db.collection("stockExits").where("productName", "==", normalizedProductName).get();
-  const totalReceived = entriesSnap.docs.reduce((s, d) => s + (Number(d.data().approvedQty) || 0), 0);
-  const totalExited = exitsSnap.docs.reduce((s, d) => s + (Number(d.data().qtyDispatched) || 0), 0);
-  const availableQty = totalReceived - totalExited;
-  
-  if (parsedQty > availableQty) {
-    throw new ApiError(400, `Insufficient stock. Only ${availableQty} kg of "${productName}" is available.`);
-  }
 
   const stockExitId = req.body.stockExitId || (await getNextId("stockExitCounter", "SX"));
   const folder = `stockmanagement/stockexit/${stockExitId}`;
@@ -567,6 +561,7 @@ exports.createStockExit = asyncHandler(async (req, res) => {
 
     t.set(db.collection("stockExits").doc(stockExitId), data);
   });
+  clearCachePrefix("stock_summary");
   res.status(201).json({ id: stockExitId, ...data });
 });
 
@@ -653,6 +648,7 @@ exports.updateStockExit = asyncHandler(async (req, res) => {
     await ref.update(updates);
   }
 
+  clearCachePrefix("stock_summary");
   res.json({ message: "Stock exit updated" });
 });
 
@@ -754,6 +750,7 @@ exports.bulkDeleteStockEntries = asyncHandler(async (req, res) => {
   }
 
   await bulkDeleteDocs("stockEntries", ids, "stockEntryId", "stockentry");
+  clearCachePrefix("stock_summary");
   res.json({ message: `${ids.length} stock entries deleted successfully` });
 });
 
@@ -764,10 +761,16 @@ exports.bulkDeleteStockExits = asyncHandler(async (req, res) => {
   const { ids } = req.body;
   if (!ids || !Array.isArray(ids)) throw new ApiError(400, "Invalid IDs array");
   await bulkDeleteDocs("stockExits", ids, "stockExitId", "stockexit");
+  clearCachePrefix("stock_summary");
   res.json({ message: `${ids.length} stock exits deleted successfully` });
 });
 
 exports.getStockSummary = asyncHandler(async (req, res) => {
+  const cached = getCache("stock_summary", 60);
+  if (cached) {
+    return res.json({ summary: cached });
+  }
+
   // Fetch all entries and exits to calculate accurate stock summaries
   const [entriesSnap, exitsSnap] = await Promise.all([
     db.collection("stockEntries").get(),
@@ -815,6 +818,7 @@ exports.getStockSummary = asyncHandler(async (req, res) => {
     s.salesExpense = Math.round(s.salesExpense);
   });
 
+  setCache("stock_summary", summary, 60);
   res.json({ summary });
 });
 

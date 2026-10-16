@@ -30,11 +30,9 @@ exports.getServices = asyncHandler(async (req, res) => {
   const start = (parseInt(page) - 1) * parseInt(pageSize);
   const lim = parseInt(pageSize);
 
-  let baseQuery = db.collection("services").where("isDeleted", "!=", true);
+  let baseQuery = db.collection("services");
 
   const needsMemoryFilter = search || req.query.kpiFilter || !isManager;
-
-
 
   // Fallback to memory for complex filters
   const snap = await baseQuery.get();
@@ -49,7 +47,8 @@ exports.getServices = asyncHandler(async (req, res) => {
         assignedAt: data.assignedAt?.toDate?.()?.toISOString() || null,
         dueDate: data.dueDate?.toDate?.()?.toISOString() || data.dueDate || null,
       };
-    });
+    })
+    .filter((s) => s.isDeleted !== true);
 
   if (!isManager) {
     services = services.filter((s) => s.assignedTo === req.user.id || s.assignedBy === req.user.id || s.createdBy === req.user.id);
@@ -93,8 +92,8 @@ exports.getDashboardStats = asyncHandler(async (req, res) => {
   const isManager = isManagerUser(req.user);
   const now = new Date();
 
-  const snap = await db.collection("services").where("isDeleted", "!=", true).get();
-  let allDocs = snap.docs.map((d) => d.data());
+  const snap = await db.collection("services").get();
+  let allDocs = snap.docs.map((d) => d.data()).filter((s) => s.isDeleted !== true);
 
   if (!isManager) {
     allDocs = allDocs.filter((s) => s.assignedTo === req.user.id || s.assignedBy === req.user.id || s.createdBy === req.user.id);

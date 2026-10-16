@@ -7,9 +7,14 @@ exports.uploadFile = asyncHandler(async (req, res) => {
     return res.status(400).json({ success: false, message: "No file provided." });
   }
 
+  if (!storagePath || typeof storagePath !== "string") {
+    return res.status(400).json({ success: false, message: "Valid storagePath is required." });
+  }
+
   // storagePath includes the path and the filename, e.g., projects/isi/abc/123_file.png
   // uploadBase64File signature: uploadBase64File(base64String, folderPath, filename)
-  const pathParts = storagePath.split("/");
+  const cleanPath = storagePath.replace(/^[/\\]+/, "");
+  const pathParts = cleanPath.split("/");
   const filename = pathParts.pop();
   const folderPath = pathParts.join("/");
 

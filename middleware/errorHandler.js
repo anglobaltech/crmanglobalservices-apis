@@ -5,8 +5,10 @@ const errorHandler = (err, req, res, next) => {
   let error = err;
 
   if (!(error instanceof ApiError)) {
-    const statusCode = error.statusCode ? error.statusCode : 500;
-    const message = error.message || "Something went wrong";
+    const statusCode = error.statusCode || error.status || 500;
+    const message = error.type === "entity.too.large" 
+      ? "Uploaded file or payload is too large. Please upload a smaller file."
+      : (error.message || "Something went wrong");
     error = new ApiError(statusCode, message, false, err.stack);
   }
 

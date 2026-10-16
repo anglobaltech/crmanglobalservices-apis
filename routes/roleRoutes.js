@@ -27,7 +27,7 @@ const requireAdmin = (req, res, next) => {
   next();
 };
 
-router.post("/seed", seedRoles);              
+router.post("/seed", verifyToken, requireAdmin, seedRoles);              
 router.post("/reseed", verifyToken, requireAdmin, reseedRoles); 
 router.post("/sync-users", verifyToken, requireAdmin, syncAllUsers); 
 router.get("/", verifyToken, getRoles);
